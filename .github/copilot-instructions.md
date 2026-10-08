@@ -58,8 +58,8 @@ These instructions guide GitHub Copilot when generating, modifying, or reviewing
 - Use xUnit for all tests and FluentAssertions for assertions.
 - Every new domain rule and application service method must have unit tests covering the success path, validation failures, and edge cases (zero, negative, boundary dates, empty input).
 - Use fakes or hand-written test doubles for `IAiCategorizationClient`, clock, and repositories in unit tests. Do not call the real Gemini API from tests.
-- Integration tests should target a real SQL Server instance (or Testcontainers) and API endpoints via `WebApplicationFactory`. Mark tests that need external services with a trait so they can be skipped in CI.
-- Test names should describe behavior, for example `Method_Scenario_ExpectedResult`.
+- Integration tests should target a locally available SQL Server instance. Do not introduce Testcontainers or Docker for this project.
+- - Test names should describe behavior, for example `Method_Scenario_ExpectedResult`.
 - Do not delete or weaken existing tests to make a change pass. Explain any test change in the pull request.
 - Bug fixes must include a test that fails before the fix and passes after.
 
@@ -123,6 +123,8 @@ These instructions guide GitHub Copilot when generating, modifying, or reviewing
 - Keep each change set to a single concern. Split large requests into smaller, reviewable steps.
 - Build and run tests after changes. Do not finish with compilation errors or failing tests that you introduced.
 - Summarize what changed, why, and how it was verified.
+
+-Authentication is required for the MVP. Use ASP.NET Core Identity with SQL Server. All expense, dashboard, AI insight, and financial data endpoints must require authentication and enforce user-level data isolation. Keep authentication limited to registration, login, logout, and secure password management. Social login, MFA, roles, and advanced identity features are out of scope unless time permits.
 
 ## 12. Human Review Required
 
