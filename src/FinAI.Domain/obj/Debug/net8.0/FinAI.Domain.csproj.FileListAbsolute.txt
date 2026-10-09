@@ -1,0 +1,12 @@
+C:\Users\yousafai\Source\Repos\FinAI-AI-DLC\src\FinAI.Domain\bin\Debug\net8.0\FinAI.Domain.deps.json
+C:\Users\yousafai\Source\Repos\FinAI-AI-DLC\src\FinAI.Domain\bin\Debug\net8.0\FinAI.Domain.dll
+C:\Users\yousafai\Source\Repos\FinAI-AI-DLC\src\FinAI.Domain\bin\Debug\net8.0\FinAI.Domain.pdb
+C:\Users\yousafai\Source\Repos\FinAI-AI-DLC\src\FinAI.Domain\obj\Debug\net8.0\FinAI.Domain.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\yousafai\Source\Repos\FinAI-AI-DLC\src\FinAI.Domain\obj\Debug\net8.0\FinAI.Domain.AssemblyInfoInputs.cache
+C:\Users\yousafai\Source\Repos\FinAI-AI-DLC\src\FinAI.Domain\obj\Debug\net8.0\FinAI.Domain.AssemblyInfo.cs
+C:\Users\yousafai\Source\Repos\FinAI-AI-DLC\src\FinAI.Domain\obj\Debug\net8.0\FinAI.Domain.csproj.CoreCompileInputs.cache
+C:\Users\yousafai\Source\Repos\FinAI-AI-DLC\src\FinAI.Domain\obj\Debug\net8.0\FinAI.Domain.sourcelink.json
+C:\Users\yousafai\Source\Repos\FinAI-AI-DLC\src\FinAI.Domain\obj\Debug\net8.0\FinAI.Domain.dll
+C:\Users\yousafai\Source\Repos\FinAI-AI-DLC\src\FinAI.Domain\obj\Debug\net8.0\refint\FinAI.Domain.dll
+C:\Users\yousafai\Source\Repos\FinAI-AI-DLC\src\FinAI.Domain\obj\Debug\net8.0\FinAI.Domain.pdb
+C:\Users\yousafai\Source\Repos\FinAI-AI-DLC\src\FinAI.Domain\obj\Debug\net8.0\ref\FinAI.Domain.dll

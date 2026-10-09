@@ -1,0 +1,36 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "FinAI.Application/1.0.0": {
+        "dependencies": {
+          "FinAI.Domain": "1.0.0"
+        },
+        "runtime": {
+          "FinAI.Application.dll": {}
+        }
+      },
+      "FinAI.Domain/1.0.0": {
+        "runtime": {
+          "FinAI.Domain.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "FinAI.Application/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "FinAI.Domain/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
