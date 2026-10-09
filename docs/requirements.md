@@ -15,6 +15,14 @@ This document separates **requirements** (what the system must do or meet) from 
 
 ## 2. Functional Requirements
 
+### 2.0 Allowed Categories (shared reference)
+
+This list is the single source of allowed categories. FR-01, FR-03, FR-04, FR-05, FR-06, and the AI design must all use it.
+
+- Food, Transport, Housing, Utilities, Entertainment, Health, Shopping, Other, Uncategorized
+- Matching is case-insensitive and maps to the canonical name above. Any other value is rejected for user input, and mapped to `Uncategorized` for AI output.
+- `Uncategorized` is a valid stored value, but a transaction in that category must be re-categorized by the user before it is confirmed from an AI proposal.
+
 ### FR-01 Add Expense
 
 - **Priority**: P0
@@ -26,6 +34,8 @@ This document separates **requirements** (what the system must do or meet) from 
   - AC4: A date more than one year in the future is rejected.
   - AC5: A description longer than the configured maximum length (for example 200 characters) is rejected.
   - AC6: On success, the user sees confirmation and the expense appears in the dashboard totals.
+  - AC7: An amount with more than two decimal places is rejected with a validation message; it is never silently rounded.
+  - AC8: The date is a calendar date entered by the user. It is stored as entered and is not shifted by time zone conversion.
 - **Dependencies**: FR-02 (storage), FR-03 (category list used by the form, optional when AI is unavailable).
 
 ### FR-02 Store Transaction
@@ -38,9 +48,9 @@ This document separates **requirements** (what the system must do or meet) from 
   - AC3: Stored amounts keep two decimal places of precision.
   - AC4: Transactions are retrievable after the application restarts.
   - AC5: If the save fails, the user receives an error message and no partial record is stored.
-- **Dependencies**: None.
+- **Dependencies**: FR-07 (owner identity).
 
-### FR-03 AI Transaction Categorization and Extraction
+### FR-03
 
 - **Priority**: P0
 - **Description**: The user can type a natural-language expense (for example, "Lunch with Sam 14.50 yesterday"). The AI proposes an amount, date, description, and category. The user reviews and confirms the proposal before it is saved.
@@ -51,6 +61,8 @@ This document separates **requirements** (what the system must do or meet) from 
   - AC4: If the AI returns an invalid amount or unparseable output, no proposal is shown and the user is directed to manual entry (FR-01).
   - AC5: If the AI service is unavailable or times out within the configured limit, the user is directed to manual entry and the application remains usable.
   - AC6: The user can edit any proposed field before confirming.
+  - AC7: A missing or invalid amount or description is never silently filled in or saved. The field is shown as missing or invalid, and the user must enter a valid value before confirming. A missing or unparseable date is replaced by today's date only as a visibly marked, unconfirmed default. The user must review or change it before saving.
+  - AC8: An AI proposal with an amount that has more than two decimal places, a date that is not an exact `yyyy-MM-dd` value, or a date outside the allowed range, is flagged for correction and is not saved until the user fixes it.
 - **Dependencies**: FR-01, FR-02, NFR-AI-01, NFR-AI-02.
 
 ### FR-04 Basic Spending Dashboard
@@ -74,6 +86,8 @@ This document separates **requirements** (what the system must do or meet) from 
   - AC2: The numeric value in the answer matches the value computed by the dashboard logic for the same filter.
   - AC3: If the question cannot be mapped to a supported filter, the user receives a message stating what is supported, without a fabricated answer.
   - AC4: If the AI service is unavailable, the user can still select a category and period from the form to get the same answer.
+  - AC5: Supported questions are limited to an optional category from section 2.0 and a single calendar month (year and month). Any other filter is unsupported under AC3.
+  - AC6: The AI only maps the question text to these filters. All numeric results are calculated by deterministic code using the same logic as FR-04.
 - **Dependencies**: FR-02, FR-04, NFR-AI-01, NFR-AI-02.
 
 ### FR-06 AI Monthly Spending Insight
@@ -85,18 +99,23 @@ This document separates **requirements** (what the system must do or meet) from 
   - AC2: The insight contains no figures other than those supplied to the AI.
   - AC3: A month with no transactions produces a message that no data exists, without calling the AI.
   - AC4: If the AI service fails, the dashboard figures are still shown with a message that the insight is unavailable.
+  - AC5: The month-over-month percentage change is calculated by code as (current total minus prior total) divided by prior total, rounded to one decimal place.
+  - AC6: If the prior month's total is zero or there is no prior-month data, no percentage is shown. The insight states the absolute change instead, or that no comparison is available.
 - **Dependencies**: FR-02, FR-04, NFR-AI-01, NFR-AI-02.
 
-### FR-07 Basic Authentication (P1)
+### FR-07 Basic Authentication
 
-- **Priority**: P1
-- **Description**: The user must sign in before viewing or adding expenses, so that data is not open to anyone with access to the URL.
+- **Priority**: P0
+- **Description**: Users register, sign in, and sign out with ASP.NET Core Identity backed by SQL Server. All expense, dashboard, spending-question, and insight data is private to its owner.
 - **Acceptance criteria**:
-  - AC1: Unauthenticated requests to transaction, dashboard, question, and insight endpoints are rejected.
-  - AC2: A user can sign in with a valid username and password and sign out.
+  - AC1: A user can register an account with a unique username and password.
+  - AC2: A registered user can sign in with a valid username and password and sign out.
   - AC3: Invalid credentials return a generic error that does not reveal whether the username exists.
-  - AC4: Transactions are returned only to the user who created them.
-- **Dependencies**: FR-02.
+  - AC4: Unauthenticated requests to all expense, dashboard, spending-question, and insight endpoints return 401.
+  - AC5: The server derives the owner from the authenticated principal. A client-supplied UserId is never used for ownership or filtering and is ignored or rejected.
+  - AC6: Every transaction belongs to exactly one owner. A user cannot read, create under another identity, modify, or delete another user's transaction; such requests return 404.
+  - AC7: Dashboard, spending-question, and insight results include only transactions owned by the authenticated user.
+- **Dependencies**: FR-02, NFR-SEC-05, NFR-SEC-06.
 
 ### FR-08 Basic Error Handling (P1)
 
@@ -127,18 +146,21 @@ This document separates **requirements** (what the system must do or meet) from 
 - **NFR-SEC-02**: Database access uses parameterized queries only.
 - **NFR-SEC-03**: Error responses do not expose stack traces, SQL, or internal type names.
 - **NFR-SEC-04**: Transport uses HTTPS.
-- **NFR-SEC-05**: If FR-07 is delivered, passwords are stored only as salted hashes, never in plain text.
+- **NFR-SEC-05**: Passwords are stored only as salted hashes (ASP.NET Core Identity default), never in plain text.
+- **NFR-SEC-06**: Every protected endpoint requires an authenticated principal. Owner identity comes only from that principal. Every read, create, update, and delete is filtered by owner, and cross-user access returns 404.
+- **NFR-SEC-07**: Usernames are unique (case-insensitive). Password policy uses ASP.NET Core Identity defaults with a minimum length of 8. Lockout applies after 5 failed sign-in attempts for 15 minutes. Login failures return the same generic message for an unknown user, a wrong password, and a locked account.
+- **NFR-SEC-08**: Auth cookies are `HttpOnly`, `Secure`, and `SameSite=Lax`. The antiforgery cookie is `HttpOnly`, `Secure`, and `SameSite=Strict`. State-changing requests require a valid antiforgery token, and the token is refreshed after sign-in and sign-out.
 
 ### 3.2 Performance
 
 - **NFR-PERF-01**: Adding an expense (excluding AI calls) completes in under 1 second for a single user.
 - **NFR-PERF-02**: The dashboard for one month loads in under 2 seconds with 5,000 stored transactions.
-- **NFR-PERF-03**: AI calls use a timeout of no more than 10 seconds.
+- **NFR-PERF-03**: Each AI request has an overall deadline of 10 seconds, including retries and backoff. Each attempt has a 3-second timeout within that deadline.
 
 ### 3.3 Reliability
 
 - **NFR-REL-01**: The application stays usable with manual entry and dashboard views when the AI service is unavailable.
-- **NFR-REL-02**: AI calls are retried at most 2 times with backoff.
+- **NFR-REL-02**: AI calls use one initial attempt and at most 2 retries (three attempts total), with backoff, only for transient failures (attempt timeout, network error, HTTP 429, HTTP 503). Retries never run past the overall deadline in NFR-PERF-03.
 - **NFR-REL-03**: A failed save never leaves a partial transaction.
 
 ### 3.4 Maintainability
@@ -152,13 +174,13 @@ This document separates **requirements** (what the system must do or meet) from 
 
 - **NFR-TST-01**: Business rules (validation, totals, filters) are testable without a database or network.
 - **NFR-TST-02**: Unit tests do not call the Gemini API; AI clients are replaced by test doubles.
-- **NFR-TST-03**: Integration tests cover each P0 API endpoint.
+- **NFR-TST-03**: Integration tests cover each P0 API endpoint, including anonymous requests (401) and cross-user isolation for expenses, dashboard, questions, and insights.
 - **NFR-TST-04**: All tests run in GitHub Actions CI.
 
 ### 3.6 AI Output Validation
 
 - **NFR-AI-01**: All AI responses are parsed into strongly typed results. Unparseable responses are rejected.
-- **NFR-AI-02**: Amounts must be positive decimals; dates must be valid and within the allowed range; categories must belong to the allowed list. Anything else falls back as defined in FR-03.
+- **NFR-AI-02**: Amounts must be positive decimals with at most two decimal places; dates must be exact `yyyy-MM-dd` values within the allowed range; categories must belong to the allowed list. Anything else falls back as defined in FR-03.
 - **NFR-AI-03**: AI output never writes to storage without user confirmation (FR-03 AC2).
 - **NFR-AI-04**: Totals and dashboard figures are never produced by AI.
 - **NFR-AI-05**: The data sent to the AI includes only what the feature needs. No user identifiers are sent.
@@ -178,6 +200,7 @@ These reflect the architecture and tooling in `.github/copilot-instructions.md` 
 |-------|----------|
 | Platform | .NET 8, C#, ASP.NET Core Web API |
 | Data access | SQL Server with EF Core, code-first migrations |
+| Authentication | ASP.NET Core Identity with SQL Server; no social login, MFA, or roles |
 | Money type | `decimal(18,2)` |
 | Validation library | FluentValidation or data annotations |
 | Error format | ProblemDetails (RFC 7807) |
@@ -200,3 +223,4 @@ These items are excluded from this requirements set:
 - RAG and vector databases
 - Multi-agent architecture
 - Microservices and Docker
+- Social login, multi-factor authentication (MFA), and roles

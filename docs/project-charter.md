@@ -27,7 +27,10 @@ A small, readable application in which a user can record expenses in plain langu
 ## 6. MVP Scope
 
 A user can:
-
+- Register, log in, and log out securely.
+- Store each user's expenses separately.
+- Require authentication for expense, dashboard, and AI-related endpoints.
+- Prevent users from accessing another user's financial data.
 - Add an expense (amount, date, description, category).
 - Enter a natural-language expense description, and have AI extract and categorize the transaction details, which the user can review before saving.
 - View a basic spending dashboard (totals and breakdown by category).
@@ -43,12 +46,14 @@ Technical scope: ASP.NET Core Web API (.NET 8), SQL Server with Entity Framework
 - Processing real payments or money movement.
 - Becoming a production banking or multi-user commercial platform.
 - Complex financial planning or reporting.
+- Advanced identity features: social login, multi-factor authentication (MFA), and roles.
 - Docker containers, microservices, or other infrastructure beyond what the MVP needs.
-- Authentication and multi-user accounts in the MVP (the data model should allow a `UserId` scope later).
 
 ## 8. Success Criteria
 
 - All MVP capabilities in section 6 work end to end from the web UI through the API to SQL Server.
+- Registration, login, and logout work with ASP.NET Core Identity; all expense, dashboard, and AI endpoints reject unauthenticated requests.
+- A user cannot read or change another user's expenses, dashboard figures, AI answers, or insights (verified by tests).
 - AI categorization works with the Gemini free tier, and the app remains usable with manual entry when the AI service is unavailable.
 - Unit and integration tests pass in GitHub Actions CI.
 - Copilot-generated artifacts (instructions, charter, code, tests, documentation) are traceable in the repository.
@@ -56,6 +61,7 @@ Technical scope: ASP.NET Core Web API (.NET 8), SQL Server with Entity Framework
 
 ## 9. Technical Constraints
 
+- Use ASP.NET Core Identity for authentication, with user and expense data stored in SQL Server. Protect API endpoints and enforce user-level data isolation.
 - .NET 8, C#, ASP.NET Core Web API.
 - SQL Server with Entity Framework Core (code-first migrations).
 - Google Gemini API, free tier only. Model name and API key come from configuration.
@@ -69,7 +75,7 @@ Technical scope: ASP.NET Core Web API (.NET 8), SQL Server with Entity Framework
 - Developers have the .NET 8 SDK, a SQL Server instance, and a Gemini API key.
 - Gemini free-tier quotas are sufficient for demonstration use.
 - Expense data is entered by hand or via AI-assisted text input; no external data sources are needed.
-- Single-user usage is acceptable for the MVP.
+- Multiple registered users can use the application, with each user's financial data isolated.
 - The one-week timeline is fixed; scope is reduced before timeline is extended.
 
 ## 11. Risks
@@ -82,6 +88,8 @@ Technical scope: ASP.NET Core Web API (.NET 8), SQL Server with Entity Framework
 | SQL Server or environment setup problems | Delayed development | Document setup in README; standard tooling only |
 | Misuse of the app as real financial advice | Reputational or user harm | Clear disclaimer that FinAI is a demo and provides no financial advice |
 | Accidental secret exposure | Credential compromise | User secrets, `.gitignore`, CI secret references, rotate on exposure |
+| Authentication or authorization flaw exposes one user's data to another | Privacy breach | ASP.NET Core Identity defaults, user ID scoping on every query, isolation tests, human security review |
+| Insecure password or session handling | Account compromise | Identity password hashing and lockout defaults, HTTPS-only cookies, no custom crypto |
 
 ## 12. AI-Specific Risks
 
@@ -91,6 +99,7 @@ Technical scope: ASP.NET Core Web API (.NET 8), SQL Server with Entity Framework
 - **Prompt injection through user text**: Malicious descriptions could alter AI behavior. Mitigation: treat AI output as untrusted; no AI output writes directly to the database or changes totals.
 - **Availability and quota limits**: Free-tier limits may block calls. Mitigation: caching of repeated descriptions, retry limits, and a functional manual path.
 - **Non-deterministic output**: Results may differ between runs, making tests flaky. Mitigation: unit tests use fake AI clients; no real Gemini calls in tests.
+- **Cross-user data in AI answers or insights**: A question or prompt could reach another user's data. Mitigation: AI only produces filters; the query is always scoped to the authenticated user ID, and AI prompts contain only that user's aggregated figures.
 
 ## 13. Human Responsibilities
 
@@ -128,5 +137,6 @@ A feature or MVP item is done when:
 - All tests pass locally and in GitHub Actions CI.
 - The application works with manual entry when Gemini is unavailable.
 - No secrets are committed, and no personal or sample data is hard-coded.
+- Authentication is enforced: unauthenticated requests to protected endpoints are rejected, and isolation tests show one user cannot access another user's data.
 - Relevant documentation (README, ADRs, XML comments) is updated in the same change.
 - A human has reviewed the change and approved it.

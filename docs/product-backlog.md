@@ -134,11 +134,11 @@ Each story below lists only additional DoD items specific to that story.
 - **Priority**: P0
 - **User story**: As a developer, I want Gemini calls behind an interface so that the app can be tested without the real API and the provider can be swapped.
 - **Acceptance criteria**:
-  - AC1: `IAiCategorizationClient` is defined in `FinAI.Application`; the Gemini implementation is in `FinAI.Infrastructure`.
-  - AC2: Each call has a timeout of 10 seconds or less.
-  - AC3: At most 2 retries with backoff; retries are not attempted on validation failures.
+  - AC1: `IAIService` and `AiResult<T>` are defined in `FinAI.Application`; `GeminiAIService` is in `FinAI.Infrastructure`.
+  - AC2: Each AI request has an overall deadline of 10 seconds, with a 3-second timeout per attempt.
+  - AC3: One initial attempt plus at most 2 retries for transient failures only (timeout, network error, HTTP 429/503), with backoff; retries never run past the overall deadline.
   - AC4: The API key is read from configuration and never logged.
-- **Definition of Done**: Timeout and retry behavior tested with a fake HTTP handler; no real Gemini calls in tests.
+- **Definition of Done**: Timeout and retry behavior tested with a fake HTTP handler and fake clock; no real Gemini calls in tests.
 - **Dependencies**: FND-02, FND-01.
 - **Complexity**: M
 
@@ -164,7 +164,9 @@ Each story below lists only additional DoD items specific to that story.
   - AC2: The endpoint does not save anything to the database.
   - AC3: If the AI is unavailable, times out, or returns invalid output, the endpoint returns a response indicating manual entry is required, with no proposal.
   - AC4: Input text is limited to 500 characters.
-- **Definition of Done**: Integration test with a fake AI client covers success and fallback.
+  - AC5: A proposal with a missing or unparseable date uses today's date, marked as an unconfirmed default (`DateIsDefaulted`).
+  - AC6: A proposal with an invalid amount or a description outside 1 to 200 characters returns field-level errors and no saveable proposal.
+- **Definition of Done**: Integration test with a fake AI client covers success, defaulted date, invalid fields, and fallback.
 - **Dependencies**: AIT-02, TXN-01.
 - **Complexity**: M
 
@@ -177,6 +179,7 @@ Each story below lists only additional DoD items specific to that story.
   - AC2: Nothing is saved until the user clicks Confirm.
   - AC3: A category of `Uncategorized` prompts the user to choose one before confirming.
   - AC4: If no proposal is returned, the UI points to the manual form.
+  - AC5: A defaulted date is labelled as an unconfirmed default, and Confirm is blocked until the user edits it or confirms it.
 - **Definition of Done**: Manual test of confirm, edit, and fallback paths.
 - **Dependencies**: AIT-03, TXN-03.
 - **Complexity**: M
@@ -326,7 +329,7 @@ Each story below lists only additional DoD items specific to that story.
 - **Priority**: P0
 - **User story**: As a developer, I want the AI paths tested with fakes so that fallbacks are verified without calling Gemini.
 - **Acceptance criteria**:
-  - AC1: A fake `IAiCategorizationClient` supports success, invalid output, timeout, and unavailable responses.
+  - AC1: A fake `IAIService` supports success, invalid output, timeout, and unavailable responses.
   - AC2: Tests verify AIT-02 validation and the fallback behavior in AIT-03, ASK-02, and INS-02.
   - AC3: No test makes a real Gemini call.
 - **Definition of Done**: Tests pass in CI without an API key.
@@ -338,8 +341,8 @@ Each story below lists only additional DoD items specific to that story.
 - **Priority**: P0
 - **User story**: As a developer, I want integration tests for each P0 endpoint so that the full stack is verified.
 - **Acceptance criteria**:
-  - AC1: Tests use `WebApplicationFactory` and a SQL Server instance (or Testcontainers).
-  - AC2: Tests cover create, read, dashboard, question, and insight endpoints.
+  - AC1: Tests use `WebApplicationFactory` and a locally available SQL Server instance. Testcontainers and Docker are not used.
+  - AC2: Tests cover create, read, dashboard, question, and insight endpoints, plus anonymous 401 and cross-user 404 checks.
   - AC3: Tests needing external services are marked with a trait so they can be skipped in CI.
 - **Definition of Done**: Tests pass locally and in CI, or are skipped with the trait where the external service is required.
 - **Dependencies**: TXN-02, DSH-01, ASK-02, INS-02.
@@ -372,29 +375,32 @@ Each story below lists only additional DoD items specific to that story.
 - **Dependencies**: FND-01.
 - **Complexity**: S
 
-### SEC-03 Sign-in and sign-out with hashed passwords
+### SEC-03 Registration, sign-in, and sign-out with ASP.NET Core Identity
 
-- **Priority**: P1
-- **User story**: As a user, I want to sign in before using the app so that my expenses are not open to anyone with the URL.
+- **Priority**: P0
+- **User story**: As a user, I want to register, sign in, and sign out so that my expenses are private to me.
 - **Acceptance criteria**:
-  - AC1: Unauthenticated requests to transaction, dashboard, assistant, and insight endpoints return 401.
-  - AC2: Sign-in with valid credentials succeeds; sign-out ends the session.
-  - AC3: Invalid credentials return a generic error that does not reveal whether the username exists.
-  - AC4: Passwords are stored only as salted hashes.
-- **Definition of Done**: Authentication design approved by a human (it is a security decision); tests cover the acceptance criteria.
+  - AC1: Registration creates a user with a unique username (case-insensitive) and a password meeting Identity defaults with minimum length 8. A duplicate username returns 409.
+  - AC2: Sign-in with valid credentials succeeds; sign-out ends the session. Lockout applies after 5 failed attempts for 15 minutes.
+  - AC3: Invalid credentials, unknown users, and locked accounts return the same generic 401 message.
+  - AC4: Passwords are stored only as salted hashes (Identity default).
+  - AC5: Auth cookies are `HttpOnly`, `Secure`, and `SameSite=Lax`. The antiforgery token is fetched from `GET /api/v1/auth/csrf` before register, login, and after sign-in or sign-out, and is validated on every POST.
+  - AC6: Unauthenticated requests to transaction, dashboard, assistant, and insight endpoints return 401.
+- **Definition of Done**: Authentication design approved by a human (security decision); integration tests cover AC1 to AC6.
 - **Dependencies**: FND-03, SEC-02.
 - **Complexity**: L
 
 ### SEC-04 Per-user data scoping
 
-- **Priority**: P1
+- **Priority**: P0
 - **User story**: As a user, I want my transactions visible only to me so that other users cannot see my spending.
 - **Acceptance criteria**:
   - AC1: Transactions store the owning user ID.
-  - AC2: All queries are filtered by the signed-in user.
+  - AC2: All expense, dashboard, question, and insight queries are filtered by the owner ID from the validated `ClaimsPrincipal`. Client-supplied user IDs are ignored.
   - AC3: A request for another user's transaction returns 404.
-- **Definition of Done**: Integration test with two users confirms isolation.
-- **Dependencies**: SEC-03.
+  - AC4: The AI never receives the owner ID.
+- **Definition of Done**: Integration test with two users confirms isolation; anonymous access tests return 401.
+- **Dependencies**: SEC-03, FND-03.
 - **Complexity**: S
 
 ### SEC-05 Secret handling check
@@ -441,25 +447,39 @@ Each story below lists only additional DoD items specific to that story.
 
 ## Recommended Implementation Order
 
-Target: P0 first, P1 only with remaining budget. Stop and cut P1 items if the schedule slips.
+Target: all P0 stories, in order. P1 stories are cut first. Authentication (SEC-03, SEC-04) is P0 and is built before any expense endpoint, so every endpoint is owner-scoped from the start.
 
 | Step | Stories | Purpose |
 |------|---------|---------|
 | 1 | FND-01, FND-02, SEC-05 | Solution, configuration, secret placeholders |
-| 2 | FND-03, TXN-01, TXN-02, TST-01 (transaction parts) | Store and validate expenses |
-| 3 | TXN-03, FND-05, CI-01, CI-02 | First usable UI and CI |
-| 4 | DSH-01, DSH-02, ASK-01 | Deterministic totals and filters |
-| 5 | AIT-01, AIT-02, TST-02 | AI client, validation, fakes |
-| 6 | AIT-03, AIT-04 | Natural-language entry with review |
-| 7 | ASK-02, ASK-03 | Natural-language spending questions |
-| 8 | INS-01, INS-02, INS-03 | Monthly AI insight |
-| 9 | TST-03, SEC-01, SEC-02 | Integration tests and boundary security |
-| 10 | FND-04, AIT-05 | P1: error handling and AI audit logging |
-| 11 | SEC-03, SEC-04 | P1: authentication and per-user scoping |
+| 2 | FND-03, SEC-03, SEC-04 | Database, Identity, owner-scoped schema |
+| 3 | TXN-01, TXN-02, TST-01 (transaction parts) | Store and validate expenses per owner |
+| 4 | TXN-03, FND-05, CI-01, CI-02 | First usable UI with sign-in and CI |
+| 5 | DSH-01, DSH-02, ASK-01 | Deterministic owner-scoped totals and filters |
+| 6 | AIT-01, AIT-02, TST-02 | AI client, validation, fakes |
+| 7 | AIT-03, AIT-04 | Natural-language entry with review |
+| 8 | ASK-02, ASK-03 | Natural-language spending questions |
+| 9 | INS-01, INS-02, INS-03 | Monthly AI insight with deterministic template |
+| 10 | TST-03, SEC-01, SEC-02 | Integration tests (including cross-user and anonymous 401) and boundary security |
+| 11 | FND-04, AIT-05 | P1: error handling and AI audit logging |
 
-Rough effort (from the S, M, L ranges in the table above):
+### Effort and budget
 
-- **P0**: 27 stories (15 S, 11 M, 1 L) is about 41 to 80 hours, roughly 53 at the midpoint. This exceeds the 25-hour budget.
-- **P1**: 4 stories (3 S, 1 L as SEC-03) is about 8 to 14 hours.
+Rough effort from the S, M, and L ranges above:
 
-Before starting, the team must either reduce P0 scope (for example, simplify ASK-02, merge TST-02 into TST-01, or drop the separate CI-02 format step) or approve a larger budget. SEC-03 (L) is the largest P1 risk and should be cut first.
+- **P0 scope**: 29 stories, roughly 46 to 88 hours (midpoint about 67). This exceeds the 25-hour budget by a wide margin. Build order follows the table, and the cut list below applies if the schedule slips.
+- **P1 scope**: FND-04 and AIT-05 (about 2 to 4 hours). Build only if budget remains.
+
+**Priority for a runnable end-to-end MVP.** Build and keep, in this order: expense persistence (TXN-01, TXN-02, FND-03), Identity and owner-scoped queries (SEC-03, SEC-04), dashboard calculations (DSH-01, DSH-02), transaction review and confirmation (AIT-03, AIT-04), AI fallbacks with a deterministic path (AIT-01, AIT-02), tests (TST-01, TST-02, TST-03), CI (CI-01, CI-02), and a runnable README and demo guide.
+
+**Cut or simplify if the budget slips (in this order):**
+
+1. Insight generation wording: ship the deterministic template only (INS-02 AI sentence deferred). Keep INS-01 and INS-03.
+2. ASK-02 free-text question: keep ASK-01 and ASK-03 (category and month form). The AI question endpoint is deferred.
+3. TST-03 scope: keep one integration test per endpoint group, including the 401 and cross-user tests.
+4. TXN-03 polish and FND-05 styling: plain forms only.
+5. SEC-01 and SEC-02 extras: keep the validation rules, drop additional tests.
+
+Do not cut authentication, owner scoping, expense persistence, or the fallback paths. Those are required for the MVP and for the security requirements.
+
+Decision needed: approve a larger budget, or accept the cut list above. Cut P1 (FND-04, AIT-05) first.
