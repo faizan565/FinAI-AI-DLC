@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\FinAI.Application\FinAI.Application.csproj" />
     <ProjectReference Include="..\..\src\FinAI.Domain\FinAI.Domain.csproj" />
+    <ProjectReference Include="..\..\src\FinAI.Infrastructure\FinAI.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

@@ -9,6 +9,10 @@
 
 <div class="row">
     <div class="col-md-8 col-lg-6">
+        @if (ViewData["Notice"] is string notice)
+        {
+            <div class="alert alert-info" role="status">@notice</div>
+        }
         <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
 
         <form asp-action="@(isEdit ? "Edit" : "Create")" asp-route-id="@Model.Id" method="post" novalidate>
@@ -37,6 +41,15 @@
                 </select>
                 <span asp-validation-for="Category" class="text-danger"></span>
             </div>
+            @if (Model.RequiresDateConfirmation)
+            {
+                <div class="form-check mb-3">
+                    <input asp-for="DateConfirmed" class="form-check-input" />
+                    <label asp-for="DateConfirmed" class="form-check-label">I confirm this date is correct</label>
+                    <span asp-validation-for="DateConfirmed" class="text-danger d-block"></span>
+                </div>
+                <input type="hidden" asp-for="RequiresDateConfirmation" />
+            }
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary">Save</button>
                 <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>

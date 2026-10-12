@@ -28,6 +28,10 @@ public sealed class TransactionFormViewModel
     [Required]
     public string Category { get; set; } = "Other";
 
+    public bool RequiresDateConfirmation { get; set; }
+
+    public bool DateConfirmed { get; set; }
+
     public ApiTransactionInput ToInput() =>
         new(Amount, DateOnly.FromDateTime(Date.GetValueOrDefault()), Description.Trim(), Category);
 
@@ -47,3 +51,10 @@ public sealed record TransactionListViewModel(
     int TotalPages,
     int TotalCount,
     string? ErrorMessage);
+
+public sealed class ExpenseAssistViewModel
+{
+    [Required(ErrorMessage = "Describe the expense first.")]
+    [StringLength(500, ErrorMessage = "Description must be 500 characters or fewer.")]
+    public string Text { get; set; } = string.Empty;
+}

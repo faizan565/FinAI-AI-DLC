@@ -37,11 +37,59 @@ public sealed class TransactionsController(FinAiApiClient api) : FinAiController
         return View("Form", new TransactionFormViewModel { Date = DateTime.UtcNow.Date });
     }
 
+    [HttpGet]
+    public IActionResult Assist()
+    {
+        ViewData["Title"] = "Add with AI";
+        return View(new ExpenseAssistViewModel());
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Assist(ExpenseAssistViewModel model, CancellationToken cancellationToken)
+    {
+        ViewData["Title"] = "Add with AI";
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        var result = await Api.CreateExpenseProposalAsync(model.Text.Trim(), cancellationToken);
+        if (SessionExpiredRedirect(result.Error) is { } expired)
+        {
+            return expired;
+        }
+
+        if (!result.IsSuccess)
+        {
+            AddApiError(result.Error!);
+            return View(model);
+        }
+
+        var proposal = result.Value!;
+        ViewData["Notice"] = proposal.DateIsDefaulted
+            ? "Review the proposal. The date was not found in your text, so today's date is shown and needs your confirmation."
+            : "Review the proposal, correct anything needed, then save.";
+        return View("Form", new TransactionFormViewModel
+        {
+            Amount = proposal.Amount,
+            Date = proposal.Date.ToDateTime(TimeOnly.MinValue),
+            Description = proposal.Description,
+            Category = proposal.Category,
+            RequiresDateConfirmation = proposal.DateIsDefaulted
+        });
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(TransactionFormViewModel model, CancellationToken cancellationToken)
     {
         ViewData["Title"] = "Add transaction";
+        if (model.RequiresDateConfirmation && !model.DateConfirmed)
+        {
+            ModelState.AddModelError(nameof(model.DateConfirmed), "Confirm the date before saving.");
+        }
+
         if (!ModelState.IsValid)
         {
             return View("Form", model);

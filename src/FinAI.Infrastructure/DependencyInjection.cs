@@ -1,10 +1,13 @@
+using FinAI.Application.Ai;
 using FinAI.Application.Transactions;
+using FinAI.Infrastructure.Ai;
 using FinAI.Infrastructure.Identity;
 using FinAI.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace FinAI.Infrastructure;
 
@@ -37,6 +40,15 @@ public static class DependencyInjection
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<ITransactionService, TransactionService>();
         services.AddSingleton(TimeProvider.System);
+
+        services.Configure<GeminiOptions>(configuration.GetSection(GeminiOptions.SectionName));
+        services.AddHttpClient<IAIService, GeminiAIService>((serviceProvider, client) =>
+        {
+            var options = serviceProvider.GetRequiredService<IOptions<GeminiOptions>>().Value;
+            client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/");
+            client.Timeout = TimeSpan.FromSeconds(options.AttemptTimeoutSeconds);
+        });
+        services.AddScoped<IExpenseProposalService, ExpenseProposalService>();
 
         return services;
     }

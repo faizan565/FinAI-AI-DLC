@@ -1,4 +1,14 @@
-﻿<!DOCTYPE html>
+﻿@using FinAI.Web.Services
+@inject FinAiApiClient Api
+@{
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString();
+    var currentAction = ViewContext.RouteData.Values["action"]?.ToString();
+    var isAccountPage = string.Equals(currentController, "Account", StringComparison.OrdinalIgnoreCase);
+    var isOnSignIn = isAccountPage && string.Equals(currentAction, "Login", StringComparison.OrdinalIgnoreCase);
+    var isOnRegister = isAccountPage && string.Equals(currentAction, "Register", StringComparison.OrdinalIgnoreCase);
+    var isSignedIn = Api.IsSignedIn;
+}
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -18,25 +28,40 @@
                 </button>
                 <div class="collapse navbar-collapse" id="mainNav">
                     <ul class="navbar-nav me-auto">
-                        <li class="nav-item">
-                            <a class="nav-link" asp-controller="Dashboard" asp-action="Index">Dashboard</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-controller="Transactions" asp-action="Index">Transactions</a>
-                        </li>
+                        @if (isSignedIn)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Dashboard" asp-action="Index">Dashboard</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Transactions" asp-action="Index">Transactions</a>
+                            </li>
+                        }
                     </ul>
                     <ul class="navbar-nav">
-                        <li class="nav-item">
-                            <a class="nav-link" asp-controller="Account" asp-action="Login">Sign in</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-controller="Account" asp-action="Register">Register</a>
-                        </li>
-                        <li class="nav-item">
-                            <form asp-controller="Account" asp-action="Logout" method="post" class="d-inline">
-                                <button type="submit" class="btn btn-link nav-link">Sign out</button>
-                            </form>
-                        </li>
+                        @if (isSignedIn)
+                        {
+                            <li class="nav-item">
+                                <form asp-controller="Account" asp-action="Logout" method="post" class="d-inline">
+                                    <button type="submit" class="btn btn-link nav-link">Sign out</button>
+                                </form>
+                            </li>
+                        }
+                        else
+                        {
+                            if (!isOnSignIn)
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link" asp-controller="Account" asp-action="Login">Sign in</a>
+                                </li>
+                            }
+                            if (!isOnRegister)
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link" asp-controller="Account" asp-action="Register">Register</a>
+                                </li>
+                            }
+                        }
                     </ul>
                 </div>
             </div>

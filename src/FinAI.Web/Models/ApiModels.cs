@@ -15,3 +15,7 @@ public sealed record ApiPagedResult<T>(IReadOnlyList<T> Items, int Page, int Pag
 public sealed record ApiCategoryTotal(string Category, decimal Total);
 
 public sealed record ApiMonthlySummary(int Year, int Month, decimal Total, IReadOnlyList<ApiCategoryTotal> Categories);
+
+public sealed record ApiExpenseProposalRequest(string Text);
+
+public sealed record ApiExpenseProposal(decimal Amount, DateOnly Date, string Description, string Category, bool DateIsDefaulted);
