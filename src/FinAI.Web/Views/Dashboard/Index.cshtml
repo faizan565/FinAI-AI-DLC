@@ -1,0 +1,82 @@
+@model FinAI.Web.Models.DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+    var monthName = new DateTime(Model.Year, Model.Month, 1).ToString("MMMM yyyy");
+}
+
+<h1 class="h3 mb-3">Dashboard — @monthName</h1>
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-warning" role="alert">@Model.ErrorMessage</div>
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <p class="text-muted mb-1">Total spending this month</p>
+                <p class="display-6 fw-semibold mb-0">@((Model.Summary?.Total ?? 0m).ToString("C"))</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <h2 class="h6">Category breakdown</h2>
+                @if (Model.Summary is null || Model.Summary.Categories.Count == 0)
+                {
+                    <p class="text-muted mb-0">No spending recorded this month.</p>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var category in Model.Summary.Categories)
+                        {
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span>@category.Category</span>
+                                <span class="fw-semibold">@category.Total.ToString("C")</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h2 class="h5 mb-0">Recent transactions</h2>
+    <a asp-controller="Transactions" asp-action="Create" class="btn btn-sm btn-primary">Add transaction</a>
+</div>
+
+@if (Model.RecentTransactions.Count == 0)
+{
+    <p class="text-muted">No transactions yet. Add your first one to see it here.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Category</th>
+                    <th class="text-end">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.RecentTransactions)
+                {
+                    <tr>
+                        <td>@item.Date.ToString("yyyy-MM-dd")</td>
+                        <td>@item.Description</td>
+                        <td>@item.Category</td>
+                        <td class="text-end">@item.Amount.ToString("C")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

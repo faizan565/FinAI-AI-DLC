@@ -1,3 +1,4 @@
+using FinAI.Application.Transactions;
 using FinAI.Infrastructure.Identity;
 using FinAI.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
@@ -32,6 +33,10 @@ public static class DependencyInjection
             })
             .AddEntityFrameworkStores<FinAIDbContext>()
             .AddDefaultTokenProviders();
+
+        services.AddScoped<ITransactionRepository, TransactionRepository>();
+        services.AddScoped<ITransactionService, TransactionService>();
+        services.AddSingleton(TimeProvider.System);
 
         return services;
     }

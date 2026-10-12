@@ -11,10 +11,11 @@
 using System;
 using System.Reflection;
 
+[assembly: Microsoft.Extensions.Configuration.UserSecrets.UserSecretsIdAttribute("8cec15b8-d226-4c63-b910-ef6d0f77276f")]
 [assembly: System.Reflection.AssemblyCompanyAttribute("FinAI.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+646b662c1c4bc0c81be4e49ed386eebb6e0ad8a9")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b027709a3c4e2a1b375d8d1c6c98cbc2229228cb")]
 [assembly: System.Reflection.AssemblyProductAttribute("FinAI.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FinAI.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

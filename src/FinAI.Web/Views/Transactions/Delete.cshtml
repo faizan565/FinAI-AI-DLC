@@ -1,0 +1,21 @@
+@model FinAI.Web.Models.ApiTransaction
+@{
+    ViewData["Title"] = "Delete transaction";
+}
+
+<h1 class="h3 mb-3">Delete transaction</h1>
+
+<div class="card shadow-sm mb-3" style="max-width: 32rem;">
+    <div class="card-body">
+        <p class="mb-1"><strong>@Model.Description</strong></p>
+        <p class="mb-1 text-muted">@Model.Date.ToString("yyyy-MM-dd") · @Model.Category</p>
+        <p class="mb-0">@Model.Amount.ToString("C")</p>
+    </div>
+</div>
+
+<p>Are you sure you want to delete this transaction? This cannot be undone.</p>
+
+<form asp-action="Delete" asp-route-id="@Model.Id" method="post" class="d-flex gap-2">
+    <button type="submit" class="btn btn-danger">Yes, delete</button>
+    <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+</form>
