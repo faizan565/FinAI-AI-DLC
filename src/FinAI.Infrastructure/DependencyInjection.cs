@@ -1,4 +1,5 @@
 using FinAI.Application.Ai;
+using FinAI.Application.Ai;
 using FinAI.Application.Transactions;
 using FinAI.Infrastructure.Ai;
 using FinAI.Infrastructure.Identity;
@@ -49,6 +50,7 @@ public static class DependencyInjection
             client.Timeout = TimeSpan.FromSeconds(options.AttemptTimeoutSeconds);
         });
         services.AddScoped<IExpenseProposalService, ExpenseProposalService>();
+        services.AddScoped<ISpendingQuestionService, SpendingQuestionService>();
 
         return services;
     }

@@ -8,7 +8,7 @@ public sealed class GeminiOptions
 
     public string Model { get; set; } = string.Empty;
 
-    public int AttemptTimeoutSeconds { get; set; } = 3;
+    public int AttemptTimeoutSeconds { get; set; } = 15;
 
-    public int OverallTimeoutSeconds { get; set; } = 10;
+    public int OverallTimeoutSeconds { get; set; } = 30;
 }

@@ -28,14 +28,35 @@ public sealed class GeminiAIService(HttpClient httpClient, IOptions<GeminiOption
         required = new[] { "amount", "date", "description", "category" }
     };
 
+    private static readonly object SpendingQuestionResponseSchema = new
+    {
+        type = "OBJECT",
+        properties = new
+        {
+            intent = new { type = "STRING", @enum = new[] { "Total", "Category", "ByCategory", "TopCategories", "Unsupported" } },
+            category = new { type = "STRING", nullable = true, @enum = TransactionCategories.All },
+            period = new { type = "STRING", nullable = true, @enum = new[] { "CurrentMonth", "PreviousMonth", "SpecificMonth" } },
+            year = new { type = "INTEGER", nullable = true },
+            month = new { type = "INTEGER", nullable = true },
+            limit = new { type = "INTEGER", nullable = true }
+        },
+        required = new[] { "intent", "category", "period", "year", "month", "limit" }
+    };
+
     private readonly GeminiOptions _options = options.Value;
 
-    public async Task<AiResult<TransactionProposal>> ExtractTransactionAsync(string text, DateOnly today, CancellationToken cancellationToken)
+    public Task<AiResult<TransactionProposal>> ExtractTransactionAsync(string text, DateOnly today, CancellationToken cancellationToken) =>
+        SendWithRetriesAsync(BuildRequest(text, today), modelText => ParseProposal(modelText, text, today), cancellationToken);
+
+    public Task<AiResult<SpendingQuestionFilter>> ParseSpendingQuestionAsync(string question, DateOnly today, CancellationToken cancellationToken) =>
+        SendWithRetriesAsync(BuildSpendingQuestionRequest(question, today), ParseSpendingFilter, cancellationToken);
+
+    private async Task<AiResult<T>> SendWithRetriesAsync<T>(object body, Func<string?, AiResult<T>> parse, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(_options.ApiKey) || string.IsNullOrWhiteSpace(_options.Model))
         {
             logger.LogWarning("Gemini is not configured. Set Gemini:ApiKey and Gemini:Model.");
-            return Failed(AiFailure.Unavailable);
+            return Failed<T>(AiFailure.Unavailable);
         }
 
         var overallTimeout = TimeSpan.FromSeconds(_options.OverallTimeoutSeconds);
@@ -43,9 +64,8 @@ public sealed class GeminiAIService(HttpClient httpClient, IOptions<GeminiOption
         var clock = Stopwatch.StartNew();
         using var overall = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         overall.CancelAfter(overallTimeout);
-        var body = BuildRequest(text, today);
 
-        var result = Failed(AiFailure.Timeout);
+        var result = Failed<T>(AiFailure.Timeout);
         for (var attempt = 1; attempt <= MaxAttempts; attempt++)
         {
             if (attempt > 1)
@@ -53,14 +73,14 @@ public sealed class GeminiAIService(HttpClient httpClient, IOptions<GeminiOption
                 var backoff = RetryBackoff[attempt - 2];
                 if (overallTimeout - clock.Elapsed < backoff + attemptTimeout)
                 {
-                    result = Failed(AiFailure.Timeout);
+                    result = Failed<T>(AiFailure.Timeout);
                     break;
                 }
 
                 await Task.Delay(backoff, cancellationToken);
             }
 
-            var (attemptResult, retryable) = await SendAttemptAsync(body, text, today, attemptTimeout, attempt, overall.Token, cancellationToken);
+            var (attemptResult, retryable) = await SendAttemptAsync(body, parse, attemptTimeout, attempt, overall.Token, cancellationToken);
             result = attemptResult;
             if (!retryable)
             {
@@ -70,16 +90,15 @@ public sealed class GeminiAIService(HttpClient httpClient, IOptions<GeminiOption
 
         if (!result.IsSuccess)
         {
-            logger.LogWarning("Gemini expense extraction failed with {Failure}", result.Failure);
+            logger.LogWarning("Gemini request failed with {Failure}", result.Failure);
         }
 
         return result;
     }
 
-    private async Task<(AiResult<TransactionProposal> Result, bool Retryable)> SendAttemptAsync(
+    private async Task<(AiResult<T> Result, bool Retryable)> SendAttemptAsync<T>(
         object body,
-        string text,
-        DateOnly today,
+        Func<string?, AiResult<T>> parse,
         TimeSpan attemptTimeout,
         int attemptNumber,
         CancellationToken overallToken,
@@ -101,51 +120,68 @@ public sealed class GeminiAIService(HttpClient httpClient, IOptions<GeminiOption
             logger.LogInformation("Gemini attempt {Attempt} returned HTTP {StatusCode} after {ElapsedMs} ms", attemptNumber, (int)response.StatusCode, elapsed.ElapsedMilliseconds);
             if (response.StatusCode == HttpStatusCode.TooManyRequests)
             {
-                return (Failed(AiFailure.RateLimited), true);
+                return (Failed<T>(AiFailure.RateLimited), true);
             }
 
             if (response.StatusCode == HttpStatusCode.ServiceUnavailable)
             {
-                return (Failed(AiFailure.Unavailable), true);
+                return (Failed<T>(AiFailure.Unavailable), true);
             }
 
             if (!response.IsSuccessStatusCode)
             {
-                return (Failed(AiFailure.Unavailable), false);
+                return (Failed<T>(AiFailure.Unavailable), false);
             }
 
             var payload = await response.Content.ReadFromJsonAsync<GeminiResponse>(JsonOptions, attempt.Token);
             var modelText = payload?.Candidates?.FirstOrDefault()?.Content?.Parts?.FirstOrDefault()?.Text;
-            return (ParseProposal(modelText, text, today), false);
+            return (parse(modelText), false);
         }
         catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
             logger.LogWarning("Gemini attempt {Attempt} was cancelled after {ElapsedMs} ms ({ExceptionType})", attemptNumber, elapsed.ElapsedMilliseconds, exception.GetType().Name);
-            return (Failed(AiFailure.Timeout), false);
+            return (Failed<T>(AiFailure.Timeout), false);
         }
         catch (HttpRequestException exception)
         {
             logger.LogWarning("Gemini attempt {Attempt} failed with a network error after {ElapsedMs} ms ({ExceptionType})", attemptNumber, elapsed.ElapsedMilliseconds, exception.GetType().Name);
-            return (Failed(AiFailure.Unavailable), true);
+            return (Failed<T>(AiFailure.Unavailable), true);
         }
         catch (Exception exception) when (exception is JsonException or NotSupportedException)
         {
             logger.LogWarning("Gemini attempt {Attempt} returned an unreadable response after {ElapsedMs} ms ({ExceptionType})", attemptNumber, elapsed.ElapsedMilliseconds, exception.GetType().Name);
-            return (Failed(AiFailure.InvalidOutput), false);
+            return (Failed<T>(AiFailure.InvalidOutput), false);
         }
+    }
+
+    private static AiResult<SpendingQuestionFilter> ParseSpendingFilter(string? modelText)
+    {
+        if (string.IsNullOrWhiteSpace(modelText))
+        {
+            return Failed<SpendingQuestionFilter>(AiFailure.InvalidOutput);
+        }
+
+        var fields = JsonSerializer.Deserialize<GeminiSpendingJson>(modelText, JsonOptions);
+        if (fields is null)
+        {
+            return Failed<SpendingQuestionFilter>(AiFailure.InvalidOutput);
+        }
+
+        return SpendingQuestionValidator.Validate(new RawSpendingQuestionFields(
+            fields.Intent, fields.Category, fields.Period, fields.Year, fields.Month, fields.Limit));
     }
 
     private static AiResult<TransactionProposal> ParseProposal(string? modelText, string text, DateOnly today)
     {
         if (string.IsNullOrWhiteSpace(modelText))
         {
-            return Failed(AiFailure.InvalidOutput);
+            return Failed<TransactionProposal>(AiFailure.InvalidOutput);
         }
 
         var fields = JsonSerializer.Deserialize<GeminiExpenseJson>(modelText, JsonOptions);
         if (fields is null)
         {
-            return Failed(AiFailure.InvalidOutput);
+            return Failed<TransactionProposal>(AiFailure.InvalidOutput);
         }
 
         var rawAmount = fields.Amount is JsonElement amount && amount.ValueKind is not (JsonValueKind.Undefined or JsonValueKind.Null)
@@ -165,7 +201,16 @@ public sealed class GeminiAIService(HttpClient httpClient, IOptions<GeminiOption
         generationConfig = new { responseMimeType = "application/json", responseSchema = ResponseSchema }
     };
 
-    private static AiResult<TransactionProposal> Failed(AiFailure failure) => AiResult<TransactionProposal>.Fail(failure);
+    private static object BuildSpendingQuestionRequest(string question, DateOnly today) => new
+    {
+        systemInstruction = new { parts = new[] { new { text = GeminiPrompts.SpendingQuestionSystemInstruction } } },
+        contents = new[] { new { role = "user", parts = new[] { new { text = GeminiPrompts.BuildSpendingQuestionMessage(question, today) } } } },
+        generationConfig = new { responseMimeType = "application/json", responseSchema = SpendingQuestionResponseSchema }
+    };
+
+    private static AiResult<T> Failed<T>(AiFailure failure) => AiResult<T>.Fail(failure);
+
+    private sealed record GeminiSpendingJson(string? Intent, string? Category, string? Period, int? Year, int? Month, int? Limit);
 
     private sealed record GeminiExpenseJson(JsonElement? Amount, string? Date, string? Description, string? Category);
 

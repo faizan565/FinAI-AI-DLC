@@ -68,6 +68,9 @@ public sealed class ExpenseProposalServiceTests
             LastToday = today;
             return Task.FromResult(Result);
         }
+
+        public Task<AiResult<SpendingQuestionFilter>> ParseSpendingQuestionAsync(string question, DateOnly today, CancellationToken cancellationToken) =>
+            Task.FromResult(AiResult<SpendingQuestionFilter>.Fail(AiFailure.Unavailable));
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider

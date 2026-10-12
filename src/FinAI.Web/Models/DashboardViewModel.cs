@@ -5,4 +5,7 @@ public sealed record DashboardViewModel(
     int Month,
     ApiMonthlySummary? Summary,
     IReadOnlyList<ApiTransaction> RecentTransactions,
-    string? ErrorMessage);
+    string? ErrorMessage,
+    string? Question = null,
+    ApiSpendingAnswer? Answer = null,
+    string? QuestionError = null);

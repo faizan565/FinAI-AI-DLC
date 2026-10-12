@@ -45,6 +45,51 @@
     </div>
 </div>
 
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h2 class="h6">Ask FinAI</h2>
+        <p class="text-muted small mb-2">Ask about your own spending, for example "How much did I spend on food last month?" or "What were my three biggest expense categories last month?"</p>
+        <form asp-controller="Dashboard" asp-action="Ask" method="post" class="d-flex gap-2 mb-2">
+            <input type="text" name="question" class="form-control" maxlength="300" value="@Model.Question" placeholder="Ask a question about your spending" aria-label="Spending question" />
+            <button type="submit" class="btn btn-primary text-nowrap">Ask</button>
+        </form>
+        @if (!string.IsNullOrEmpty(Model.QuestionError))
+        {
+            <div class="alert alert-warning mb-0" role="alert">@Model.QuestionError</div>
+        }
+        @if (Model.Answer is { } answer)
+        {
+            if (answer.Intent == "Unsupported")
+            {
+                <div class="alert alert-info mt-3 mb-0" role="status">@(answer.Message ?? "FinAI can only answer questions about your recorded spending.")</div>
+            }
+            else
+            {
+                <div class="mt-3">
+                    <p class="mb-1 text-muted small">Period: @answer.From?.ToString("MMM d, yyyy") to @answer.ToInclusive?.ToString("MMM d, yyyy")</p>
+                    <p class="display-6 fw-semibold mb-2">@((answer.Total ?? 0m).ToString("C"))</p>
+                    @if (answer.Categories is not { Count: > 0 } categories)
+                    {
+                        <p class="text-muted mb-0">No matching spending in this period.</p>
+                    }
+                    else
+                    {
+                        <ul class="list-group list-group-flush">
+                            @foreach (var category in categories)
+                            {
+                                <li class="list-group-item d-flex justify-content-between px-0">
+                                    <span>@category.Category</span>
+                                    <span class="fw-semibold">@category.Total.ToString("C")</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            }
+        }
+    </div>
+</div>
+
 <div class="d-flex justify-content-between align-items-center mb-2">
     <h2 class="h5 mb-0">Recent transactions</h2>
     <div class="d-flex gap-2">

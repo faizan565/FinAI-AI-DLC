@@ -45,6 +45,9 @@ public sealed class FinAiApiClient(HttpClient httpClient, IHttpContextAccessor h
     public Task<ApiResult<ApiExpenseProposal>> CreateExpenseProposalAsync(string text, CancellationToken cancellationToken) =>
         ExecuteAsync<ApiExpenseProposal>(HttpMethod.Post, "api/v1/ai/expense-proposal", new ApiExpenseProposalRequest(text), requiresCsrf: true, cancellationToken);
 
+    public Task<ApiResult<ApiSpendingAnswer>> AskSpendingQuestionAsync(string text, CancellationToken cancellationToken) =>
+        ExecuteAsync<ApiSpendingAnswer>(HttpMethod.Post, "api/v1/ai/spending-question", new ApiSpendingQuestionRequest(text), requiresCsrf: true, cancellationToken);
+
     public Task<ApiResult<ApiTransaction>> UpdateTransactionAsync(Guid id, ApiTransactionInput input, CancellationToken cancellationToken) =>
         ExecuteAsync<ApiTransaction>(HttpMethod.Put, $"api/v1/transactions/{id}", input, requiresCsrf: true, cancellationToken);
 

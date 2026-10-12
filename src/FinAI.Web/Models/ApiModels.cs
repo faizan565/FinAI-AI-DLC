@@ -19,3 +19,7 @@ public sealed record ApiMonthlySummary(int Year, int Month, decimal Total, IRead
 public sealed record ApiExpenseProposalRequest(string Text);
 
 public sealed record ApiExpenseProposal(decimal Amount, DateOnly Date, string Description, string Category, bool DateIsDefaulted);
+
+public sealed record ApiSpendingQuestionRequest(string Text);
+
+public sealed record ApiSpendingAnswer(string Intent, string? Category, DateOnly? From, DateOnly? ToInclusive, decimal? Total, IReadOnlyList<ApiCategoryTotal>? Categories, string? Message = null);

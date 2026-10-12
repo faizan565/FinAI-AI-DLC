@@ -15,7 +15,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("FinAI.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+fdd218a0d3559e7dbad86f49a2cdcd7c1d3321fc")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+38b20a68c25aa45c8cfb9633f8975786767760e2")]
 [assembly: System.Reflection.AssemblyProductAttribute("FinAI.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FinAI.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -64,7 +64,7 @@ public sealed class GeminiAIServiceTests
     }
 
     [Fact]
-    public async Task ExtractTransactionAsync_Timeouts_ReturnTimeoutAfterThreeAttempts()
+    public async Task ExtractTransactionAsync_Timeouts_ReturnTimeoutWithoutRetry()
     {
         var handler = new ScriptedHandler(_ => Task.FromException<HttpResponseMessage>(new TaskCanceledException("timeout")));
         var service = CreateService(handler);
@@ -72,7 +72,7 @@ public sealed class GeminiAIServiceTests
         var result = await service.ExtractTransactionAsync(InputText, Today, CancellationToken.None);
 
         Assert.Equal(AiFailure.Timeout, result.Failure);
-        Assert.Equal(3, handler.Calls);
+        Assert.Equal(1, handler.Calls);
     }
 
     [Fact]

@@ -6,6 +6,11 @@ public sealed class FakeAiService : IAIService
 {
     public AiResult<TransactionProposal> Result { get; set; } = AiResult<TransactionProposal>.Fail(AiFailure.Unavailable);
 
+    public AiResult<SpendingQuestionFilter> SpendingFilter { get; set; } = AiResult<SpendingQuestionFilter>.Fail(AiFailure.Unavailable);
+
     public Task<AiResult<TransactionProposal>> ExtractTransactionAsync(string text, DateOnly today, CancellationToken cancellationToken) =>
         Task.FromResult(Result);
+
+    public Task<AiResult<SpendingQuestionFilter>> ParseSpendingQuestionAsync(string question, DateOnly today, CancellationToken cancellationToken) =>
+        Task.FromResult(SpendingFilter);
 }
