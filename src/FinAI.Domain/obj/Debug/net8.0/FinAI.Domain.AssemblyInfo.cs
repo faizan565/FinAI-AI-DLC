@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("FinAI.Domain")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+fdd218a0d3559e7dbad86f49a2cdcd7c1d3321fc")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5b4214d8fefe68280044498abc0678a2612fe0fa")]
 [assembly: System.Reflection.AssemblyProductAttribute("FinAI.Domain")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FinAI.Domain")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -47,7 +47,10 @@
 
 <div class="d-flex justify-content-between align-items-center mb-2">
     <h2 class="h5 mb-0">Recent transactions</h2>
-    <a asp-controller="Transactions" asp-action="Create" class="btn btn-sm btn-primary">Add transaction</a>
+    <div class="d-flex gap-2">
+        <a asp-controller="Transactions" asp-action="Assist" class="btn btn-sm btn-outline-primary">Add with AI</a>
+        <a asp-controller="Transactions" asp-action="Create" class="btn btn-sm btn-primary">Add transaction</a>
+    </div>
 </div>
 
 @if (Model.RecentTransactions.Count == 0)

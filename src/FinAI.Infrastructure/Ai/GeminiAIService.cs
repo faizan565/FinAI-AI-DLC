@@ -60,7 +60,7 @@ public sealed class GeminiAIService(HttpClient httpClient, IOptions<GeminiOption
                 await Task.Delay(backoff, cancellationToken);
             }
 
-            var (attemptResult, retryable) = await SendAttemptAsync(body, text, today, attemptTimeout, overall.Token, cancellationToken);
+            var (attemptResult, retryable) = await SendAttemptAsync(body, text, today, attemptTimeout, attempt, overall.Token, cancellationToken);
             result = attemptResult;
             if (!retryable)
             {
@@ -81,11 +81,13 @@ public sealed class GeminiAIService(HttpClient httpClient, IOptions<GeminiOption
         string text,
         DateOnly today,
         TimeSpan attemptTimeout,
+        int attemptNumber,
         CancellationToken overallToken,
         CancellationToken cancellationToken)
     {
         using var attempt = CancellationTokenSource.CreateLinkedTokenSource(overallToken);
         attempt.CancelAfter(attemptTimeout);
+        var elapsed = Stopwatch.StartNew();
 
         try
         {
@@ -96,6 +98,7 @@ public sealed class GeminiAIService(HttpClient httpClient, IOptions<GeminiOption
             request.Headers.Add(ApiKeyHeaderName, _options.ApiKey);
 
             using var response = await httpClient.SendAsync(request, attempt.Token);
+            logger.LogInformation("Gemini attempt {Attempt} returned HTTP {StatusCode} after {ElapsedMs} ms", attemptNumber, (int)response.StatusCode, elapsed.ElapsedMilliseconds);
             if (response.StatusCode == HttpStatusCode.TooManyRequests)
             {
                 return (Failed(AiFailure.RateLimited), true);
@@ -115,16 +118,19 @@ public sealed class GeminiAIService(HttpClient httpClient, IOptions<GeminiOption
             var modelText = payload?.Candidates?.FirstOrDefault()?.Content?.Parts?.FirstOrDefault()?.Text;
             return (ParseProposal(modelText, text, today), false);
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
-            return (Failed(AiFailure.Timeout), !overallToken.IsCancellationRequested);
+            logger.LogWarning("Gemini attempt {Attempt} was cancelled after {ElapsedMs} ms ({ExceptionType})", attemptNumber, elapsed.ElapsedMilliseconds, exception.GetType().Name);
+            return (Failed(AiFailure.Timeout), false);
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException exception)
         {
+            logger.LogWarning("Gemini attempt {Attempt} failed with a network error after {ElapsedMs} ms ({ExceptionType})", attemptNumber, elapsed.ElapsedMilliseconds, exception.GetType().Name);
             return (Failed(AiFailure.Unavailable), true);
         }
         catch (Exception exception) when (exception is JsonException or NotSupportedException)
         {
+            logger.LogWarning("Gemini attempt {Attempt} returned an unreadable response after {ElapsedMs} ms ({ExceptionType})", attemptNumber, elapsed.ElapsedMilliseconds, exception.GetType().Name);
             return (Failed(AiFailure.InvalidOutput), false);
         }
     }
