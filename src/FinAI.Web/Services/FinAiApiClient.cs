@@ -37,7 +37,43 @@ public sealed class FinAiApiClient(HttpClient httpClient, IHttpContextAccessor h
         ExecuteAsync<ApiMonthlyInsight>(HttpMethod.Get, $"api/v1/dashboard/monthly-insights?year={year}&month={month}", null, requiresCsrf: false, cancellationToken);
 
     public Task<ApiResult<ApiPagedResult<ApiTransaction>>> ListTransactionsAsync(int page, int pageSize, CancellationToken cancellationToken) =>
-        ExecuteAsync<ApiPagedResult<ApiTransaction>>(HttpMethod.Get, $"api/v1/transactions?page={page}&pageSize={pageSize}", null, requiresCsrf: false, cancellationToken);
+        ListTransactionsAsync(new ApiTransactionFilter(null, null, null, null, null), page, pageSize, cancellationToken);
+
+    public Task<ApiResult<ApiPagedResult<ApiTransaction>>> ListTransactionsAsync(ApiTransactionFilter filter, int page, int pageSize, CancellationToken cancellationToken)
+    {
+        var query = new List<string>
+        {
+            $"page={page}",
+            $"pageSize={pageSize}"
+        };
+
+        if (filter.Period is { } period)
+        {
+            query.Add($"period={Uri.EscapeDataString(period)}");
+        }
+
+        if (filter.From is { } from)
+        {
+            query.Add($"from={from:yyyy-MM-dd}");
+        }
+
+        if (filter.To is { } to)
+        {
+            query.Add($"to={to:yyyy-MM-dd}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Category))
+        {
+            query.Add($"category={Uri.EscapeDataString(filter.Category)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Search))
+        {
+            query.Add($"search={Uri.EscapeDataString(filter.Search)}");
+        }
+
+        return ExecuteAsync<ApiPagedResult<ApiTransaction>>(HttpMethod.Get, $"api/v1/transactions?{string.Join("&", query)}", null, requiresCsrf: false, cancellationToken);
+    }
 
     public Task<ApiResult<ApiTransaction>> GetTransactionAsync(Guid id, CancellationToken cancellationToken) =>
         ExecuteAsync<ApiTransaction>(HttpMethod.Get, $"api/v1/transactions/{id}", null, requiresCsrf: false, cancellationToken);

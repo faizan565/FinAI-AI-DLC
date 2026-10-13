@@ -6,21 +6,44 @@ namespace FinAI.Infrastructure.Persistence;
 
 public sealed class TransactionRepository(FinAIDbContext dbContext) : ITransactionRepository
 {
-    public Task<int> CountAsync(string ownerId, CancellationToken cancellationToken) =>
-        dbContext.Transactions
-            .AsNoTracking()
-            .CountAsync(t => t.UserId == ownerId, cancellationToken);
+    public Task<int> CountAsync(string ownerId, TransactionListQuery query, CancellationToken cancellationToken) =>
+        ApplyFilters(dbContext.Transactions.AsNoTracking(), ownerId, query)
+            .CountAsync(cancellationToken);
 
-    public async Task<IReadOnlyList<TransactionDto>> ListAsync(string ownerId, int skip, int take, CancellationToken cancellationToken) =>
-        await dbContext.Transactions
-            .AsNoTracking()
-            .Where(t => t.UserId == ownerId)
+    public async Task<IReadOnlyList<TransactionDto>> ListAsync(string ownerId, TransactionListQuery query, int skip, int take, CancellationToken cancellationToken) =>
+        await ApplyFilters(dbContext.Transactions.AsNoTracking(), ownerId, query)
             .OrderByDescending(t => t.Date)
             .ThenBy(t => t.Id)
             .Skip(skip)
             .Take(take)
             .Select(t => new TransactionDto(t.Id, t.Amount, t.Date, t.Description, t.Category))
             .ToListAsync(cancellationToken);
+
+    private static IQueryable<Transaction> ApplyFilters(IQueryable<Transaction> source, string ownerId, TransactionListQuery query)
+    {
+        var filtered = source.Where(t => t.UserId == ownerId);
+        if (query.FromInclusive is { } from)
+        {
+            filtered = filtered.Where(t => t.Date >= from);
+        }
+
+        if (query.ToExclusive is { } to)
+        {
+            filtered = filtered.Where(t => t.Date < to);
+        }
+
+        if (query.Category is { } category)
+        {
+            filtered = filtered.Where(t => t.Category == category);
+        }
+
+        if (query.Search is { } search)
+        {
+            filtered = filtered.Where(t => t.Description.Contains(search));
+        }
+
+        return filtered;
+    }
 
     public Task<TransactionDto?> GetAsync(string ownerId, Guid id, CancellationToken cancellationToken) =>
         dbContext.Transactions

@@ -1,4 +1,5 @@
 @model FinAI.Web.Models.TransactionListViewModel
+@using FinAI.Web.Models
 @{
     ViewData["Title"] = "Transactions";
     var message = TempData["Message"] as string;
@@ -23,9 +24,50 @@
     <div class="alert alert-danger" role="alert">@error</div>
 }
 
+<form method="get" asp-action="Index" class="card card-body mb-3" aria-label="Filter transactions">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label" for="filter-period">Period</label>
+            <select id="filter-period" name="period" class="form-select">
+                <option value="">All dates</option>
+                @foreach (var option in TransactionPeriodOptions.All)
+                {
+                    <option value="@option.Value" selected="@(Model.Filter.Period == option.Value)">@option.Label</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label" for="filter-from">From</label>
+            <input id="filter-from" type="date" name="from" class="form-control" value="@Model.Filter.From?.ToString("yyyy-MM-dd")" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label" for="filter-to">To</label>
+            <input id="filter-to" type="date" name="to" class="form-control" value="@Model.Filter.To?.ToString("yyyy-MM-dd")" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label" for="filter-category">Category</label>
+            <select id="filter-category" name="category" class="form-select">
+                <option value="">All Categories</option>
+                @foreach (var category in TransactionCategoryOptions.All)
+                {
+                    <option value="@category" selected="@(Model.Filter.Category == category)">@category</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="filter-search">Description</label>
+            <input id="filter-search" type="search" name="search" maxlength="200" class="form-control" value="@Model.Filter.Search" />
+        </div>
+        <div class="col-12 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Apply filters</button>
+            <a asp-action="Index" class="btn btn-outline-secondary">Clear filters</a>
+        </div>
+    </div>
+</form>
+
 @if (Model.Items.Count == 0)
 {
-    <p class="text-muted">No transactions yet.</p>
+    <p class="text-muted">@(Model.Filter.HasActiveFilters ? "No transactions match the selected filters." : "No transactions yet.")</p>
 }
 else
 {
@@ -63,11 +105,11 @@ else
         <nav aria-label="Transaction pages">
             <ul class="pagination">
                 <li class="page-item @(Model.Page <= 1 ? "disabled" : "")">
-                    <a class="page-link" asp-action="Index" asp-route-page="@(Model.Page - 1)">Previous</a>
+                    <a class="page-link" asp-action="Index" asp-route-page="@(Model.Page - 1)" asp-route-period="@Model.Filter.Period" asp-route-from="@Model.Filter.From?.ToString("yyyy-MM-dd")" asp-route-to="@Model.Filter.To?.ToString("yyyy-MM-dd")" asp-route-category="@Model.Filter.Category" asp-route-search="@Model.Filter.Search">Previous</a>
                 </li>
                 <li class="page-item disabled"><span class="page-link">Page @Model.Page of @Model.TotalPages</span></li>
                 <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : "")">
-                    <a class="page-link" asp-action="Index" asp-route-page="@(Model.Page + 1)">Next</a>
+                    <a class="page-link" asp-action="Index" asp-route-page="@(Model.Page + 1)" asp-route-period="@Model.Filter.Period" asp-route-from="@Model.Filter.From?.ToString("yyyy-MM-dd")" asp-route-to="@Model.Filter.To?.ToString("yyyy-MM-dd")" asp-route-category="@Model.Filter.Category" asp-route-search="@Model.Filter.Search">Next</a>
                 </li>
             </ul>
         </nav>

@@ -50,7 +50,40 @@ public sealed record TransactionListViewModel(
     int Page,
     int TotalPages,
     int TotalCount,
-    string? ErrorMessage);
+    string? ErrorMessage,
+    TransactionFilterViewModel Filter);
+
+public sealed class TransactionFilterViewModel
+{
+    public string? Period { get; set; }
+
+    public DateTime? From { get; set; }
+
+    public DateTime? To { get; set; }
+
+    public string? Category { get; set; }
+
+    [StringLength(200, ErrorMessage = "Search must be 200 characters or fewer.")]
+    public string? Search { get; set; }
+
+    public bool HasActiveFilters =>
+        !string.IsNullOrEmpty(Period) || From is not null || To is not null ||
+        !string.IsNullOrEmpty(Category) || !string.IsNullOrWhiteSpace(Search);
+}
+
+public static class TransactionPeriodOptions
+{
+    public static IReadOnlyList<(string Value, string Label)> All { get; } =
+    [
+        ("Today", "Today"),
+        ("Yesterday", "Yesterday"),
+        ("ThisWeek", "This week"),
+        ("LastWeek", "Last week"),
+        ("ThisMonth", "This month"),
+        ("LastMonth", "Last month"),
+        ("CustomRange", "Custom date range")
+    ];
+}
 
 public sealed class ExpenseAssistViewModel
 {

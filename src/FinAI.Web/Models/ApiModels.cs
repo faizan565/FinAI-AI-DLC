@@ -12,6 +12,8 @@ public sealed record ApiTransaction(Guid Id, decimal Amount, DateOnly Date, stri
 
 public sealed record ApiPagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount);
 
+public sealed record ApiTransactionFilter(string? Period, DateOnly? From, DateOnly? To, string? Category, string? Search);
+
 public sealed record ApiCategoryTotal(string Category, decimal Total);
 
 public sealed record ApiMonthlySummary(int Year, int Month, decimal Total, IReadOnlyList<ApiCategoryTotal> Categories);

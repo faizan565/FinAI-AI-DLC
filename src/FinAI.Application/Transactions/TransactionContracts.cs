@@ -6,6 +6,26 @@ public sealed record TransactionDto(Guid Id, decimal Amount, DateOnly Date, stri
 
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount);
 
+public enum TransactionPeriod
+{
+    Today,
+    Yesterday,
+    ThisWeek,
+    LastWeek,
+    ThisMonth,
+    LastMonth,
+    CustomRange
+}
+
+public sealed record TransactionFilter(
+    TransactionPeriod? Period = null,
+    DateOnly? From = null,
+    DateOnly? To = null,
+    string? Category = null,
+    string? Search = null);
+
+public sealed record TransactionListQuery(DateOnly? FromInclusive, DateOnly? ToExclusive, string? Category, string? Search);
+
 public sealed record CategoryTotalDto(string Category, decimal Total);
 
 public sealed record MonthlySummaryDto(int Year, int Month, decimal Total, IReadOnlyList<CategoryTotalDto> Categories);

@@ -34,7 +34,7 @@ public sealed class TransactionService(ITransactionRepository repository, TimePr
         return ServiceResult<TransactionDto>.Success(ToDto(transaction.Id, normalized));
     }
 
-    public async Task<ServiceResult<PagedResult<TransactionDto>>> ListAsync(string ownerId, int page, int pageSize, CancellationToken cancellationToken)
+    public async Task<ServiceResult<PagedResult<TransactionDto>>> ListAsync(string ownerId, TransactionFilter filter, int page, int pageSize, CancellationToken cancellationToken)
     {
         if (page < 1 || pageSize < 1 || pageSize > MaxPageSize)
         {
@@ -53,10 +53,74 @@ public sealed class TransactionService(ITransactionRepository repository, TimePr
             });
         }
 
-        var totalCount = await repository.CountAsync(ownerId, cancellationToken);
-        var items = await repository.ListAsync(ownerId, (int)skip, pageSize, cancellationToken);
+        var resolved = ResolveFilter(filter);
+        if (resolved.Errors is not null)
+        {
+            return ServiceResult<PagedResult<TransactionDto>>.Invalid(resolved.Errors);
+        }
+
+        var query = resolved.Query!;
+        var totalCount = await repository.CountAsync(ownerId, query, cancellationToken);
+        var items = await repository.ListAsync(ownerId, query, (int)skip, pageSize, cancellationToken);
         return ServiceResult<PagedResult<TransactionDto>>.Success(new PagedResult<TransactionDto>(items, page, pageSize, totalCount));
     }
+
+    private (TransactionListQuery? Query, Dictionary<string, string[]>? Errors) ResolveFilter(TransactionFilter filter)
+    {
+        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var (from, to) = filter.Period switch
+        {
+            null => ((DateOnly?)null, (DateOnly?)null),
+            TransactionPeriod.Today => (today, today.AddDays(1)),
+            TransactionPeriod.Yesterday => (today.AddDays(-1), today),
+            TransactionPeriod.ThisWeek => (StartOfWeek(today), StartOfWeek(today).AddDays(7)),
+            TransactionPeriod.LastWeek => (StartOfWeek(today).AddDays(-7), StartOfWeek(today)),
+            TransactionPeriod.ThisMonth => (StartOfMonth(today), StartOfMonth(today).AddMonths(1)),
+            TransactionPeriod.LastMonth => (StartOfMonth(today).AddMonths(-1), StartOfMonth(today)),
+            TransactionPeriod.CustomRange => (filter.From, filter.To?.AddDays(1)),
+            _ => ((DateOnly?)null, (DateOnly?)null)
+        };
+
+        if (filter.Period == TransactionPeriod.CustomRange)
+        {
+            if (filter.From is null || filter.To is null)
+            {
+                return (null, new Dictionary<string, string[]> { ["dateRange"] = new[] { "Custom date range requires both a start and end date." } });
+            }
+
+            if (filter.From > filter.To)
+            {
+                return (null, new Dictionary<string, string[]> { ["dateRange"] = new[] { "Start date must not be after end date." } });
+            }
+        }
+
+        string? category = null;
+        if (!string.IsNullOrWhiteSpace(filter.Category))
+        {
+            if (!TransactionCategories.TryNormalize(filter.Category, out var canonical))
+            {
+                return (null, new Dictionary<string, string[]> { ["category"] = new[] { "Category is not supported." } });
+            }
+
+            category = canonical;
+        }
+
+        var search = string.IsNullOrWhiteSpace(filter.Search) ? null : filter.Search.Trim();
+        if (search is { Length: > DescriptionMaxLength })
+        {
+            return (null, new Dictionary<string, string[]> { ["search"] = new[] { $"Search must be {DescriptionMaxLength} characters or fewer." } });
+        }
+
+        return (new TransactionListQuery(from, to, category, search), null);
+    }
+
+    private static DateOnly StartOfWeek(DateOnly date)
+    {
+        var offset = ((int)date.DayOfWeek + 6) % 7;
+        return date.AddDays(-offset);
+    }
+
+    private static DateOnly StartOfMonth(DateOnly date) => new(date.Year, date.Month, 1);
 
     public async Task<ServiceResult<TransactionDto>> GetAsync(string ownerId, Guid id, CancellationToken cancellationToken)
     {

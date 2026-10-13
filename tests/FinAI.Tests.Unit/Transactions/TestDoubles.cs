@@ -9,12 +9,20 @@ internal sealed class FakeTransactionRepository : ITransactionRepository
 
     public IReadOnlyList<Transaction> Items => _items;
 
-    public Task<int> CountAsync(string ownerId, CancellationToken cancellationToken) =>
-        Task.FromResult(_items.Count(t => t.UserId == ownerId));
+    public Task<int> CountAsync(string ownerId, TransactionListQuery query, CancellationToken cancellationToken) =>
+        Task.FromResult(Filter(ownerId, query).Count());
 
-    public Task<IReadOnlyList<TransactionDto>> ListAsync(string ownerId, int skip, int take, CancellationToken cancellationToken) =>
+    public Task<IReadOnlyList<TransactionDto>> ListAsync(string ownerId, TransactionListQuery query, int skip, int take, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<TransactionDto>>(
-            _items.Where(t => t.UserId == ownerId).Skip(skip).Take(take).Select(ToDto).ToList());
+            Filter(ownerId, query).OrderByDescending(t => t.Date).ThenBy(t => t.Id).Skip(skip).Take(take).Select(ToDto).ToList());
+
+    private IEnumerable<Transaction> Filter(string ownerId, TransactionListQuery query) =>
+        _items.Where(t =>
+            t.UserId == ownerId &&
+            (query.FromInclusive is null || t.Date >= query.FromInclusive) &&
+            (query.ToExclusive is null || t.Date < query.ToExclusive) &&
+            (query.Category is null || t.Category == query.Category) &&
+            (query.Search is null || t.Description.Contains(query.Search, StringComparison.OrdinalIgnoreCase)));
 
     public Task<TransactionDto?> GetAsync(string ownerId, Guid id, CancellationToken cancellationToken) =>
         Task.FromResult(_items.Where(t => t.UserId == ownerId && t.Id == id).Select(ToDto).SingleOrDefault());

@@ -107,7 +107,7 @@ public sealed class TransactionServiceTests
         await _sut.CreateAsync("user-1", new TransactionInput(5m, Today, "A", "Food"), CancellationToken.None);
         await _sut.CreateAsync("user-2", new TransactionInput(6m, Today, "B", "Food"), CancellationToken.None);
 
-        var result = await _sut.ListAsync("user-1", 1, 20, CancellationToken.None);
+        var result = await _sut.ListAsync("user-1", new TransactionFilter(), 1, 20, CancellationToken.None);
 
         Assert.Equal(ServiceStatus.Success, result.Status);
         Assert.Single(result.Value!.Items);
@@ -121,9 +121,119 @@ public sealed class TransactionServiceTests
     [InlineData(1, TransactionService.MaxPageSize + 1)]
     public async Task ListAsync_InvalidPaging_ReturnsInvalid(int page, int pageSize)
     {
-        var result = await _sut.ListAsync("user-1", page, pageSize, CancellationToken.None);
+        var result = await _sut.ListAsync("user-1", new TransactionFilter(), page, pageSize, CancellationToken.None);
 
         Assert.Equal(ServiceStatus.Invalid, result.Status);
+    }
+
+    [Theory]
+    [InlineData(TransactionPeriod.Today, "2025-06-01", "2025-06-01")]
+    [InlineData(TransactionPeriod.Yesterday, "2025-05-31", "2025-05-31")]
+    [InlineData(TransactionPeriod.ThisWeek, "2025-05-26", "2025-06-01")]
+    [InlineData(TransactionPeriod.LastWeek, "2025-05-19", "2025-05-25")]
+    [InlineData(TransactionPeriod.ThisMonth, "2025-06-01", "2025-06-30")]
+    [InlineData(TransactionPeriod.LastMonth, "2025-05-01", "2025-05-31")]
+    public async Task ListAsync_PeriodFilter_IncludesOnlyDatesInBoundaries(TransactionPeriod period, string first, string last)
+    {
+        var firstDate = DateOnly.Parse(first);
+        var lastDate = DateOnly.Parse(last);
+        await _sut.CreateAsync("user-1", new TransactionInput(1m, firstDate, "First", "Food"), CancellationToken.None);
+        await _sut.CreateAsync("user-1", new TransactionInput(1m, lastDate, "Last", "Food"), CancellationToken.None);
+        await _sut.CreateAsync("user-1", new TransactionInput(1m, firstDate.AddDays(-1), "Before", "Food"), CancellationToken.None);
+        await _sut.CreateAsync("user-1", new TransactionInput(1m, lastDate.AddDays(1), "After", "Food"), CancellationToken.None);
+
+        var result = await _sut.ListAsync("user-1", new TransactionFilter(period), 1, 20, CancellationToken.None);
+
+        Assert.Equal(ServiceStatus.Success, result.Status);
+        Assert.Equal(2, result.Value!.TotalCount);
+        Assert.DoesNotContain(result.Value.Items, t => t.Description is "Before" or "After");
+    }
+
+    [Fact]
+    public async Task ListAsync_CustomRange_IsInclusiveOfEndDate()
+    {
+        await _sut.CreateAsync("user-1", new TransactionInput(1m, new DateOnly(2025, 5, 10), "Start", "Food"), CancellationToken.None);
+        await _sut.CreateAsync("user-1", new TransactionInput(1m, new DateOnly(2025, 5, 20), "End", "Food"), CancellationToken.None);
+        await _sut.CreateAsync("user-1", new TransactionInput(1m, new DateOnly(2025, 5, 21), "Outside", "Food"), CancellationToken.None);
+
+        var result = await _sut.ListAsync("user-1", new TransactionFilter(TransactionPeriod.CustomRange, new DateOnly(2025, 5, 10), new DateOnly(2025, 5, 20)), 1, 20, CancellationToken.None);
+
+        Assert.Equal(2, result.Value!.TotalCount);
+    }
+
+    [Fact]
+    public async Task ListAsync_CustomRangeStartAfterEnd_ReturnsInvalid()
+    {
+        var result = await _sut.ListAsync("user-1", new TransactionFilter(TransactionPeriod.CustomRange, Today, Today.AddDays(-1)), 1, 20, CancellationToken.None);
+
+        Assert.Equal(ServiceStatus.Invalid, result.Status);
+        Assert.Contains("dateRange", result.Errors!.Keys);
+    }
+
+    [Fact]
+    public async Task ListAsync_CustomRangeMissingDates_ReturnsInvalid()
+    {
+        var result = await _sut.ListAsync("user-1", new TransactionFilter(TransactionPeriod.CustomRange, Today, null), 1, 20, CancellationToken.None);
+
+        Assert.Equal(ServiceStatus.Invalid, result.Status);
+    }
+
+    [Fact]
+    public async Task ListAsync_CategoryAndSearchCombined_FiltersBothAndNormalizesCategory()
+    {
+        await _sut.CreateAsync("user-1", new TransactionInput(5m, Today, "Morning coffee", "Food"), CancellationToken.None);
+        await _sut.CreateAsync("user-1", new TransactionInput(5m, Today, "Coffee beans", "Shopping"), CancellationToken.None);
+        await _sut.CreateAsync("user-1", new TransactionInput(5m, Today, "Bus fare", "Food"), CancellationToken.None);
+
+        var result = await _sut.ListAsync("user-1", new TransactionFilter(Category: "food", Search: "  COFFEE "), 1, 20, CancellationToken.None);
+
+        Assert.Equal(1, result.Value!.TotalCount);
+        Assert.Equal("Morning coffee", result.Value.Items[0].Description);
+    }
+
+    [Fact]
+    public async Task ListAsync_UnknownCategory_ReturnsInvalid()
+    {
+        var result = await _sut.ListAsync("user-1", new TransactionFilter(Category: "Gambling"), 1, 20, CancellationToken.None);
+
+        Assert.Equal(ServiceStatus.Invalid, result.Status);
+    }
+
+    [Fact]
+    public async Task ListAsync_NoMatches_ReturnsEmptyPage()
+    {
+        await _sut.CreateAsync("user-1", new TransactionInput(5m, Today, "Lunch", "Food"), CancellationToken.None);
+
+        var result = await _sut.ListAsync("user-1", new TransactionFilter(Search: "nothing"), 1, 20, CancellationToken.None);
+
+        Assert.Equal(ServiceStatus.Success, result.Status);
+        Assert.Empty(result.Value!.Items);
+        Assert.Equal(0, result.Value.TotalCount);
+    }
+
+    [Fact]
+    public async Task ListAsync_FilteredPaging_CountsFilteredRecords()
+    {
+        for (var i = 0; i < 5; i++)
+        {
+            await _sut.CreateAsync("user-1", new TransactionInput(1m, Today, $"Lunch {i}", "Food"), CancellationToken.None);
+        }
+        await _sut.CreateAsync("user-1", new TransactionInput(1m, Today, "Taxi", "Transport"), CancellationToken.None);
+
+        var result = await _sut.ListAsync("user-1", new TransactionFilter(Category: "Food"), 2, 2, CancellationToken.None);
+
+        Assert.Equal(5, result.Value!.TotalCount);
+        Assert.Equal(2, result.Value.Items.Count);
+    }
+
+    [Fact]
+    public async Task ListAsync_FilterDoesNotLeakOtherUsersTransactions()
+    {
+        await _sut.CreateAsync("user-2", new TransactionInput(6m, Today, "Lunch", "Food"), CancellationToken.None);
+
+        var result = await _sut.ListAsync("user-1", new TransactionFilter(Search: "Lunch"), 1, 20, CancellationToken.None);
+
+        Assert.Equal(0, result.Value!.TotalCount);
     }
 
     [Fact]

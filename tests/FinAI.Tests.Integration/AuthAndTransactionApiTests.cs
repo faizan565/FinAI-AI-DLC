@@ -175,10 +175,75 @@ public sealed class AuthAndTransactionApiTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task ListTransactions_CombinedFilters_ReturnsOnlyMatchingOwnerRecordsWithFilteredCount()
+    {
+        var owner = await RegisterUserAsync();
+        var other = await RegisterUserAsync();
+        using var ownerClient = await LoginAsync(owner);
+        using var otherClient = await LoginAsync(other);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        await PostJsonAsync(ownerClient, "/api/v1/transactions", ValidTransaction(amount: 3m, category: "Food", date: today, description: "Morning coffee"), await CsrfAsync(ownerClient));
+        await PostJsonAsync(ownerClient, "/api/v1/transactions", ValidTransaction(amount: 4m, category: "Food", date: today.AddDays(-1), description: "Coffee yesterday"), await CsrfAsync(ownerClient));
+        await PostJsonAsync(ownerClient, "/api/v1/transactions", ValidTransaction(amount: 5m, category: "Transport", date: today, description: "Coffee bus"), await CsrfAsync(ownerClient));
+        await PostJsonAsync(otherClient, "/api/v1/transactions", ValidTransaction(amount: 9m, category: "Food", date: today, description: "Coffee other"), await CsrfAsync(otherClient));
+
+        var result = await ownerClient.GetFromJsonAsync<PagedResult<TransactionDto>>(
+            $"/api/v1/transactions?period=Today&category=Food&search=coffee&page=1&pageSize=20", JsonOptions);
+
+        Assert.NotNull(result);
+        Assert.Equal(1, result!.TotalCount);
+        Assert.Equal("Morning coffee", result.Items.Single().Description);
+    }
+
+    [Fact]
+    public async Task ListTransactions_CustomRangeStartAfterEnd_Returns400()
+    {
+        var userName = await RegisterUserAsync();
+        using var client = await LoginAsync(userName);
+
+        var response = await client.GetAsync("/api/v1/transactions?period=CustomRange&from=2025-06-10&to=2025-06-01");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ListTransactions_FilteredPaging_TotalCountReflectsFilter()
+    {
+        var userName = await RegisterUserAsync();
+        using var client = await LoginAsync(userName);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        for (var i = 0; i < 3; i++)
+        {
+            await PostJsonAsync(client, "/api/v1/transactions", ValidTransaction(category: "Food", date: today, description: $"Lunch {i}"), await CsrfAsync(client));
+        }
+        await PostJsonAsync(client, "/api/v1/transactions", ValidTransaction(category: "Health", date: today, description: "Clinic"), await CsrfAsync(client));
+
+        var result = await client.GetFromJsonAsync<PagedResult<TransactionDto>>(
+            "/api/v1/transactions?category=Food&page=2&pageSize=2", JsonOptions);
+
+        Assert.Equal(3, result!.TotalCount);
+        Assert.Single(result.Items);
+    }
+
+    [Fact]
+    public async Task ListTransactions_NoMatches_ReturnsEmptyPage()
+    {
+        var userName = await RegisterUserAsync();
+        using var client = await LoginAsync(userName);
+
+        var result = await client.GetFromJsonAsync<PagedResult<TransactionDto>>(
+            "/api/v1/transactions?search=does-not-exist", JsonOptions);
+
+        Assert.Empty(result!.Items);
+        Assert.Equal(0, result.TotalCount);
+    }
+
     private static readonly string Password = "Str0ng-Passw0rd!";
 
-    private static object ValidTransaction(decimal amount = 12.50m, string category = "Food") =>
-        new { amount, date = DateOnly.FromDateTime(DateTime.UtcNow), description = "Lunch", category };
+    private static object ValidTransaction(decimal amount = 12.50m, string category = "Food", DateOnly? date = null, string description = "Lunch") =>
+        new { amount, date = date ?? DateOnly.FromDateTime(DateTime.UtcNow), description, category };
 
     private static string UniqueUserName() => $"user_{Guid.NewGuid():N}";
 

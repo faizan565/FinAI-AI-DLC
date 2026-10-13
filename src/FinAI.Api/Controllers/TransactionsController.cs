@@ -13,14 +13,15 @@ public sealed class TransactionsController(ITransactionService transactions) : C
     private string? OwnerId => User.FindFirstValue(ClaimTypes.NameIdentifier);
 
     [HttpGet]
-    public async Task<IActionResult> List([FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> List([FromQuery] TransactionPeriod? period, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to, [FromQuery] string? category, [FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken cancellationToken = default)
     {
         if (OwnerId is not { } ownerId)
         {
             return Unauthorized();
         }
 
-        var result = await transactions.ListAsync(ownerId, page, pageSize, cancellationToken);
+        var filter = new TransactionFilter(period, from, to, category, search);
+        var result = await transactions.ListAsync(ownerId, filter, page, pageSize, cancellationToken);
         return FromResult(result, value => Ok(value));
     }
 

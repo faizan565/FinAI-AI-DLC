@@ -4,7 +4,7 @@ public interface ITransactionService
 {
     Task<ServiceResult<TransactionDto>> CreateAsync(string ownerId, TransactionInput input, CancellationToken cancellationToken);
 
-    Task<ServiceResult<PagedResult<TransactionDto>>> ListAsync(string ownerId, int page, int pageSize, CancellationToken cancellationToken);
+    Task<ServiceResult<PagedResult<TransactionDto>>> ListAsync(string ownerId, TransactionFilter filter, int page, int pageSize, CancellationToken cancellationToken);
 
     Task<ServiceResult<TransactionDto>> GetAsync(string ownerId, Guid id, CancellationToken cancellationToken);
 

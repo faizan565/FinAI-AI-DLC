@@ -9,12 +9,20 @@ public sealed class TransactionsController(FinAiApiClient api) : FinAiController
     private const int PageSize = 20;
 
     [HttpGet]
-    public async Task<IActionResult> Index(int page = 1, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Index(TransactionFilterViewModel filter, int page = 1, CancellationToken cancellationToken = default)
     {
         ViewData["Title"] = "Transactions";
         page = Math.Max(1, page);
 
-        var result = await Api.ListTransactionsAsync(page, PageSize, cancellationToken);
+        var search = filter.Search?.Trim();
+        var apiFilter = new ApiTransactionFilter(
+            string.IsNullOrEmpty(filter.Period) ? null : filter.Period,
+            filter.From is null ? null : DateOnly.FromDateTime(filter.From.Value),
+            filter.To is null ? null : DateOnly.FromDateTime(filter.To.Value),
+            string.IsNullOrEmpty(filter.Category) ? null : filter.Category,
+            string.IsNullOrEmpty(search) ? null : search);
+
+        var result = await Api.ListTransactionsAsync(apiFilter, page, PageSize, cancellationToken);
         if (SessionExpiredRedirect(result.Error) is { } expired)
         {
             return expired;
@@ -27,7 +35,8 @@ public sealed class TransactionsController(FinAiApiClient api) : FinAiController
             page,
             totalPages,
             value?.TotalCount ?? 0,
-            result.Error?.Message));
+            result.Error?.Message,
+            filter));
     }
 
     [HttpGet]
