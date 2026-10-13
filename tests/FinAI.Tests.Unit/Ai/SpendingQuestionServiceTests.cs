@@ -163,6 +163,83 @@ public sealed class SpendingQuestionServiceTests
         Assert.Equal(AiFailure.Unavailable, result.Failure);
     }
 
+    [Fact]
+    public async Task AskAsync_Last7Days_IncludesTodayAndSixPrecedingDaysOnly()
+    {
+        var repo = new FakeTransactionRepository();
+        await repo.AddAsync(Tx(Owner, 1m, new DateOnly(2025, 10, 8), "Food"), CancellationToken.None);
+        await repo.AddAsync(Tx(Owner, 2m, new DateOnly(2025, 10, 9), "Food"), CancellationToken.None);
+        await repo.AddAsync(Tx(Owner, 4m, new DateOnly(2025, 10, 15), "Food"), CancellationToken.None);
+        await repo.AddAsync(Tx(Owner, 8m, new DateOnly(2025, 10, 16), "Food"), CancellationToken.None);
+        var service = Build(repo, Filter(SpendingIntent.Total, SpendingPeriod.Last7Days));
+
+        var result = await service.AskAsync(Owner, "last 7 days", CancellationToken.None);
+
+        Assert.Equal(6m, result.Value!.Total);
+        Assert.Equal(new DateOnly(2025, 10, 9), result.Value.From);
+        Assert.Equal(new DateOnly(2025, 10, 15), result.Value.ToInclusive);
+    }
+
+    [Fact]
+    public async Task AskAsync_PreviousWeek_CoversPreviousMondayThroughSunday()
+    {
+        var repo = new FakeTransactionRepository();
+        await repo.AddAsync(Tx(Owner, 3m, new DateOnly(2025, 10, 6), "Food"), CancellationToken.None);
+        await repo.AddAsync(Tx(Owner, 5m, new DateOnly(2025, 10, 12), "Food"), CancellationToken.None);
+        await repo.AddAsync(Tx(Owner, 7m, new DateOnly(2025, 10, 5), "Food"), CancellationToken.None);
+        await repo.AddAsync(Tx(Owner, 9m, new DateOnly(2025, 10, 13), "Food"), CancellationToken.None);
+        var service = Build(repo, Filter(SpendingIntent.Total, SpendingPeriod.PreviousWeek));
+
+        var result = await service.AskAsync(Owner, "last week", CancellationToken.None);
+
+        Assert.Equal(8m, result.Value!.Total);
+        Assert.Equal(new DateOnly(2025, 10, 6), result.Value.From);
+        Assert.Equal(new DateOnly(2025, 10, 12), result.Value.ToInclusive);
+    }
+
+    [Fact]
+    public async Task AskAsync_PreviousWeek_WhenTodayIsMonday_UsesPreviousCalendarWeek()
+    {
+        var repo = new FakeTransactionRepository();
+        await repo.AddAsync(Tx(Owner, 4m, new DateOnly(2025, 10, 13), "Food"), CancellationToken.None);
+        var service = new SpendingQuestionService(
+            new RecordingAi(Filter(SpendingIntent.Total, SpendingPeriod.PreviousWeek)),
+            repo,
+            new FixedTimeProvider(new DateTimeOffset(2025, 10, 13, 0, 0, 0, TimeSpan.Zero)));
+
+        var result = await service.AskAsync(Owner, "last week", CancellationToken.None);
+
+        Assert.Equal(new DateOnly(2025, 10, 6), result.Value!.From);
+        Assert.Equal(new DateOnly(2025, 10, 12), result.Value.ToInclusive);
+        Assert.Equal(0m, result.Value.Total);
+    }
+
+    [Fact]
+    public async Task AskAsync_CategoryLastWeek_FiltersToRequestedCategory()
+    {
+        var repo = new FakeTransactionRepository();
+        await repo.AddAsync(Tx(Owner, 10m, new DateOnly(2025, 10, 7), "Food"), CancellationToken.None);
+        await repo.AddAsync(Tx(Owner, 30m, new DateOnly(2025, 10, 8), "Transport"), CancellationToken.None);
+        await repo.AddAsync(Tx("owner-b", 500m, new DateOnly(2025, 10, 7), "Food"), CancellationToken.None);
+        var service = Build(repo, Filter(SpendingIntent.Category, SpendingPeriod.PreviousWeek, "Food"));
+
+        var result = await service.AskAsync(Owner, "food last week", CancellationToken.None);
+
+        Assert.Equal(10m, result.Value!.Total);
+        Assert.Equal(["Food"], result.Value.Categories.Select(c => c.Category));
+    }
+
+    [Fact]
+    public async Task AskAsync_Last7Days_WithNoTransactions_ReturnsZero()
+    {
+        var service = Build(new FakeTransactionRepository(), Filter(SpendingIntent.Total, SpendingPeriod.Last7Days));
+
+        var result = await service.AskAsync(Owner, "last 7 days", CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0m, result.Value!.Total);
+    }
+
     private static Transaction Tx(string owner, decimal amount, DateOnly date, string category) => new()
     {
         Id = Guid.NewGuid(),
@@ -191,5 +268,8 @@ public sealed class SpendingQuestionServiceTests
             Calls++;
             return Task.FromResult(filter);
         }
+
+        public Task<AiResult<string>> GenerateInsightWordingAsync(MonthlyInsightFacts facts, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
     }
 }

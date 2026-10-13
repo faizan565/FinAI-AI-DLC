@@ -8,4 +8,6 @@ public sealed record DashboardViewModel(
     string? ErrorMessage,
     string? Question = null,
     ApiSpendingAnswer? Answer = null,
-    string? QuestionError = null);
+    string? QuestionError = null,
+    ApiMonthlyInsight? Insight = null,
+    string? InsightError = null);

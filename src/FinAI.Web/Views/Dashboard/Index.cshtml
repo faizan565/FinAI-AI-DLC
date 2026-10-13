@@ -2,46 +2,14 @@
 @{
     ViewData["Title"] = "Dashboard";
     var monthName = new DateTime(Model.Year, Model.Month, 1).ToString("MMMM yyyy");
+    var chartPalette = new[] { "#0d6efd", "#198754", "#ffc107", "#dc3545", "#6f42c1", "#fd7e14", "#20c997", "#6c757d" };
 }
 
-<h1 class="h3 mb-3">Dashboard — @monthName</h1>
-
-@if (!string.IsNullOrEmpty(Model.ErrorMessage))
-{
-    <div class="alert alert-warning" role="alert">@Model.ErrorMessage</div>
-}
-
-<div class="row g-3 mb-4">
-    <div class="col-md-4">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <p class="text-muted mb-1">Total spending this month</p>
-                <p class="display-6 fw-semibold mb-0">@((Model.Summary?.Total ?? 0m).ToString("C"))</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-8">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h2 class="h6">Category breakdown</h2>
-                @if (Model.Summary is null || Model.Summary.Categories.Count == 0)
-                {
-                    <p class="text-muted mb-0">No spending recorded this month.</p>
-                }
-                else
-                {
-                    <ul class="list-group list-group-flush">
-                        @foreach (var category in Model.Summary.Categories)
-                        {
-                            <li class="list-group-item d-flex justify-content-between px-0">
-                                <span>@category.Category</span>
-                                <span class="fw-semibold">@category.Total.ToString("C")</span>
-                            </li>
-                        }
-                    </ul>
-                }
-            </div>
-        </div>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Dashboard — @monthName</h1>
+    <div class="d-flex gap-2">
+        <a asp-controller="Transactions" asp-action="Assist" class="btn btn-sm btn-outline-primary">Add with AI</a>
+        <a asp-controller="Transactions" asp-action="Create" class="btn btn-sm btn-primary">Add transaction</a>
     </div>
 </div>
 
@@ -90,12 +58,107 @@
     </div>
 </div>
 
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-warning" role="alert">@Model.ErrorMessage</div>
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <p class="text-muted mb-1">Total spending this month</p>
+                <p class="display-6 fw-semibold mb-3">@((Model.Summary?.Total ?? 0m).ToString("C"))</p>
+                @if (Model.Insight is { HasData: true } chartInsight)
+                {
+                    var circumference = 2 * Math.PI * 40;
+                    var offset = 0d;
+                    <div class="d-flex align-items-center gap-3">
+                        <svg viewBox="0 0 100 100" width="120" height="120" role="img" aria-label="Spending share by category">
+                            <g transform="rotate(-90 50 50)">
+                                @foreach (var (share, index) in chartInsight.Categories.Select((s, i) => (s, i)))
+                                {
+                                    var length = (double)share.Percentage / 100 * circumference;
+                                    <circle cx="50" cy="50" r="40" fill="none" stroke-width="16"
+                                            stroke="@chartPalette[index % chartPalette.Length]"
+                                            stroke-dasharray="@length.ToString(System.Globalization.CultureInfo.InvariantCulture) @circumference.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                                            stroke-dashoffset="@((-offset).ToString(System.Globalization.CultureInfo.InvariantCulture))">
+                                        <title>@share.Category @share.Percentage.ToString("0.0")%</title>
+                                    </circle>
+                                    offset += length;
+                                }
+                            </g>
+                        </svg>
+                        <ul class="list-unstyled small mb-0">
+                            @foreach (var (share, index) in chartInsight.Categories.Select((s, i) => (s, i)))
+                            {
+                                <li><span class="d-inline-block me-1" style="width:10px;height:10px;background:@chartPalette[index % chartPalette.Length]"></span>@share.Category @share.Percentage.ToString("0.0")%</li>
+                            }
+                        </ul>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <h2 class="h6">Category breakdown</h2>
+                @if (Model.Summary is null || Model.Summary.Categories.Count == 0)
+                {
+                    <p class="text-muted mb-0">No spending recorded this month.</p>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var category in Model.Summary.Categories)
+                        {
+                            <li class="list-group-item d-flex justify-content-between px-0">
+                                <span>@category.Category</span>
+                                <span class="fw-semibold">@category.Total.ToString("C")</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <h2 class="h6">Monthly insight</h2>
+        @if (!string.IsNullOrEmpty(Model.InsightError))
+        {
+            <div class="alert alert-warning mb-0" role="alert">@Model.InsightError</div>
+        }
+        else if (Model.Insight is { } insight)
+        {
+            <p class="mb-2" aria-label="Insight text">@insight.Insight</p>
+            if (insight.HasData)
+            {
+                <ul class="list-group list-group-flush">
+                    @foreach (var share in insight.Categories)
+                    {
+                        <li class="list-group-item px-0">
+                            <div class="d-flex justify-content-between">
+                                <span>@share.Category</span>
+                                <span class="fw-semibold">@share.Total.ToString("C") (@share.Percentage.ToString("0.0")%)</span>
+                            </div>
+                            <div class="progress mt-1" style="height: 6px;" role="img" aria-label="@share.Category @share.Percentage.ToString("0.0")% of spending">
+                                <div class="progress-bar" style="width: @share.Percentage.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)%"></div>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+            <p class="text-muted small mt-2 mb-0">@(insight.GeneratedByAi ? "Wording generated by AI from verified totals." : "Summary generated from verified totals.")</p>
+        }
+    </div>
+</div>
+
 <div class="d-flex justify-content-between align-items-center mb-2">
     <h2 class="h5 mb-0">Recent transactions</h2>
-    <div class="d-flex gap-2">
-        <a asp-controller="Transactions" asp-action="Assist" class="btn btn-sm btn-outline-primary">Add with AI</a>
-        <a asp-controller="Transactions" asp-action="Create" class="btn btn-sm btn-primary">Add transaction</a>
-    </div>
 </div>
 
 @if (Model.RecentTransactions.Count == 0)

@@ -1,5 +1,5 @@
 using FinAI.Application.Ai;
-using FinAI.Application.Ai;
+using FinAI.Application.Insights;
 using FinAI.Application.Transactions;
 using FinAI.Infrastructure.Ai;
 using FinAI.Infrastructure.Identity;
@@ -51,6 +51,7 @@ public static class DependencyInjection
         });
         services.AddScoped<IExpenseProposalService, ExpenseProposalService>();
         services.AddScoped<ISpendingQuestionService, SpendingQuestionService>();
+        services.AddScoped<IMonthlyInsightService, MonthlyInsightService>();
 
         return services;
     }

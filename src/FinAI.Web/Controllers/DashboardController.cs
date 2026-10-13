@@ -56,6 +56,12 @@ public sealed class DashboardController(FinAiApiClient api) : FinAiControllerBas
             return expiredRecent;
         }
 
+        var insight = await Api.GetMonthlyInsightAsync(now.Year, now.Month, cancellationToken);
+        if (SessionExpiredRedirect(insight.Error) is { } expiredInsight)
+        {
+            return expiredInsight;
+        }
+
         var errorMessage = summary.Error?.Message ?? recent.Error?.Message;
         var model = new DashboardViewModel(
             now.Year,
@@ -65,7 +71,9 @@ public sealed class DashboardController(FinAiApiClient api) : FinAiControllerBas
             errorMessage,
             question,
             answer,
-            questionError);
+            questionError,
+            insight.Value,
+            insight.Error?.Message ?? (insight.Value is null ? "Monthly insight is unavailable right now." : null));
 
         return View("Index", model);
     }

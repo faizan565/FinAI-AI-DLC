@@ -76,6 +76,68 @@ public sealed class SpendingQuestionValidatorTests
     }
 
     [Fact]
+    public void Validate_CategoryYesterday_IsAccepted()
+    {
+        var result = SpendingQuestionValidator.Validate(new RawSpendingQuestionFields("Category", "food", "Yesterday", null, null, null));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(SpendingIntent.Category, result.Value!.Intent);
+        Assert.Equal("Food", result.Value.Category);
+        Assert.Equal(SpendingPeriod.Yesterday, result.Value.Period);
+    }
+
+    [Fact]
+    public void Validate_TotalYesterday_IsAccepted()
+    {
+        var result = SpendingQuestionValidator.Validate(new RawSpendingQuestionFields("Total", null, "Yesterday", null, null, null));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(SpendingIntent.Total, result.Value!.Intent);
+        Assert.Equal(SpendingPeriod.Yesterday, result.Value.Period);
+    }
+
+    [Fact]
+    public void Validate_UnsupportedIntentWithYesterday_IsRejected()
+    {
+        var result = SpendingQuestionValidator.Validate(new RawSpendingQuestionFields("TopCategories", null, "Yesterday", null, null, null));
+
+        Assert.False(result.IsSuccess);
+    }
+
+    [Theory]
+    [InlineData("Total", "Last7Days", null)]
+    [InlineData("Total", "PreviousWeek", null)]
+    [InlineData("Category", "Last7Days", "food")]
+    [InlineData("Category", "PreviousWeek", "Food")]
+    public void Validate_RollingAndWeekPeriods_AcceptTotalAndCategory(string intent, string period, string? category)
+    {
+        var result = SpendingQuestionValidator.Validate(new RawSpendingQuestionFields(intent, category, period, null, null, null));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(Enum.Parse<SpendingPeriod>(period), result.Value!.Period);
+    }
+
+    [Theory]
+    [InlineData("ByCategory", "Last7Days")]
+    [InlineData("TopCategories", "PreviousWeek")]
+    public void Validate_RollingAndWeekPeriods_RejectOtherIntents(string intent, string period)
+    {
+        var result = SpendingQuestionValidator.Validate(new RawSpendingQuestionFields(intent, null, period, null, null, null));
+
+        Assert.False(result.IsSuccess);
+    }
+
+    [Theory]
+    [InlineData("Unsupported", "PreviousWeek")]
+    public void Validate_UnsupportedIntent_ReturnsUnsupportedFilter(string intent, string period)
+    {
+        var result = SpendingQuestionValidator.Validate(new RawSpendingQuestionFields(intent, null, period, null, null, null));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(SpendingIntent.Unsupported, result.Value!.Intent);
+    }
+
+    [Fact]
     public void Validate_TopCategoriesWithoutLimit_UsesDefault()
     {
         var result = SpendingQuestionValidator.Validate(new RawSpendingQuestionFields("TopCategories", null, "CurrentMonth", null, null, null));

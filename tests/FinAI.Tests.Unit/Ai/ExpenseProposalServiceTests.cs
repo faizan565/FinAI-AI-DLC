@@ -71,6 +71,9 @@ public sealed class ExpenseProposalServiceTests
 
         public Task<AiResult<SpendingQuestionFilter>> ParseSpendingQuestionAsync(string question, DateOnly today, CancellationToken cancellationToken) =>
             Task.FromResult(AiResult<SpendingQuestionFilter>.Fail(AiFailure.Unavailable));
+
+        public Task<AiResult<string>> GenerateInsightWordingAsync(MonthlyInsightFacts facts, CancellationToken cancellationToken) =>
+            Task.FromResult(AiResult<string>.Fail(AiFailure.Unavailable));
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider

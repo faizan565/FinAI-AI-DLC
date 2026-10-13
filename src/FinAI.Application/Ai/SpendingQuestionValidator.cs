@@ -39,6 +39,7 @@ public static class SpendingQuestionValidator
 
         int? year = null;
         int? month = null;
+        int? day = null;
         if (period == SpendingPeriod.SpecificMonth)
         {
             if (fields.Year is not { } fieldYear || fields.Month is not { } fieldMonth || fieldYear < MinYear || fieldYear > MaxYear || fieldMonth is < 1 or > 12)
@@ -48,6 +49,27 @@ public static class SpendingQuestionValidator
 
             year = fieldYear;
             month = fieldMonth;
+        }
+
+        if (period is SpendingPeriod.Today or SpendingPeriod.Yesterday or SpendingPeriod.DayBeforeYesterday or SpendingPeriod.SpecificDate or SpendingPeriod.Last7Days or SpendingPeriod.PreviousWeek)
+        {
+            if (intent is not (SpendingIntent.Total or SpendingIntent.Category))
+            {
+                return Unsupported();
+            }
+
+            if (period == SpendingPeriod.SpecificDate)
+            {
+                if (fields.Year is not { } dateYear || fields.Month is not { } dateMonth || fields.Day is not { } dateDay
+                    || dateYear < MinYear || dateYear > MaxYear || !IsValidDate(dateYear, dateMonth, dateDay))
+                {
+                    return Unsupported();
+                }
+
+                year = dateYear;
+                month = dateMonth;
+                day = dateDay;
+            }
         }
 
         int? limit = null;
@@ -60,8 +82,11 @@ public static class SpendingQuestionValidator
             }
         }
 
-        return AiResult<SpendingQuestionFilter>.Success(new SpendingQuestionFilter(intent, category, period, year, month, limit));
+        return AiResult<SpendingQuestionFilter>.Success(new SpendingQuestionFilter(intent, category, period, year, month, limit, day));
     }
+
+    private static bool IsValidDate(int year, int month, int day) =>
+        month is >= 1 and <= 12 && day >= 1 && day <= DateTime.DaysInMonth(year, month);
 
     private static AiResult<SpendingQuestionFilter> Unsupported() => AiResult<SpendingQuestionFilter>.Fail(AiFailure.InvalidOutput);
 }

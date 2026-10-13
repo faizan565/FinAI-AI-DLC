@@ -1,4 +1,5 @@
 using FinAI.Application.Transactions;
+using FinAI.Application.Transactions;
 
 namespace FinAI.Application.Ai;
 
@@ -15,11 +16,17 @@ public enum SpendingPeriod
 {
     CurrentMonth,
     PreviousMonth,
-    SpecificMonth
+    SpecificMonth,
+    Today,
+    Yesterday,
+    DayBeforeYesterday,
+    SpecificDate,
+    Last7Days,
+    PreviousWeek
 }
 
-public sealed record SpendingQuestionFilter(SpendingIntent Intent, string? Category, SpendingPeriod Period, int? Year, int? Month, int? Limit);
+public sealed record SpendingQuestionFilter(SpendingIntent Intent, string? Category, SpendingPeriod Period, int? Year, int? Month, int? Limit, int? Day = null);
 
-public sealed record RawSpendingQuestionFields(string? Intent, string? Category, string? Period, int? Year, int? Month, int? Limit);
+public sealed record RawSpendingQuestionFields(string? Intent, string? Category, string? Period, int? Year, int? Month, int? Limit, int? Day = null);
 
 public sealed record SpendingAnswer(SpendingIntent Intent, string? Category, DateOnly From, DateOnly ToInclusive, decimal Total, IReadOnlyList<CategoryTotalDto> Categories);

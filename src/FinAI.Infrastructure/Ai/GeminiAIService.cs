@@ -35,15 +35,29 @@ public sealed class GeminiAIService(HttpClient httpClient, IOptions<GeminiOption
         {
             intent = new { type = "STRING", @enum = new[] { "Total", "Category", "ByCategory", "TopCategories", "Unsupported" } },
             category = new { type = "STRING", nullable = true, @enum = TransactionCategories.All },
-            period = new { type = "STRING", nullable = true, @enum = new[] { "CurrentMonth", "PreviousMonth", "SpecificMonth" } },
+            period = new { type = "STRING", nullable = true, @enum = new[] { "CurrentMonth", "PreviousMonth", "SpecificMonth", "Today", "Yesterday", "DayBeforeYesterday", "SpecificDate", "Last7Days", "PreviousWeek" } },
             year = new { type = "INTEGER", nullable = true },
             month = new { type = "INTEGER", nullable = true },
+            day = new { type = "INTEGER", nullable = true },
             limit = new { type = "INTEGER", nullable = true }
         },
-        required = new[] { "intent", "category", "period", "year", "month", "limit" }
+        required = new[] { "intent", "category", "period", "year", "month", "day", "limit" }
+    };
+
+    private static readonly object InsightResponseSchema = new
+    {
+        type = "OBJECT",
+        properties = new
+        {
+            insight = new { type = "STRING" }
+        },
+        required = new[] { "insight" }
     };
 
     private readonly GeminiOptions _options = options.Value;
+
+    public Task<AiResult<string>> GenerateInsightWordingAsync(MonthlyInsightFacts facts, CancellationToken cancellationToken) =>
+        SendWithRetriesAsync(BuildInsightRequest(facts), ParseInsight, cancellationToken);
 
     public Task<AiResult<TransactionProposal>> ExtractTransactionAsync(string text, DateOnly today, CancellationToken cancellationToken) =>
         SendWithRetriesAsync(BuildRequest(text, today), modelText => ParseProposal(modelText, text, today), cancellationToken);
@@ -154,6 +168,19 @@ public sealed class GeminiAIService(HttpClient httpClient, IOptions<GeminiOption
         }
     }
 
+    private static AiResult<string> ParseInsight(string? modelText)
+    {
+        if (string.IsNullOrWhiteSpace(modelText))
+        {
+            return Failed<string>(AiFailure.InvalidOutput);
+        }
+
+        var fields = JsonSerializer.Deserialize<GeminiInsightJson>(modelText, JsonOptions);
+        return fields?.Insight is null
+            ? Failed<string>(AiFailure.InvalidOutput)
+            : InsightWordingValidator.Validate(fields.Insight);
+    }
+
     private static AiResult<SpendingQuestionFilter> ParseSpendingFilter(string? modelText)
     {
         if (string.IsNullOrWhiteSpace(modelText))
@@ -168,7 +195,7 @@ public sealed class GeminiAIService(HttpClient httpClient, IOptions<GeminiOption
         }
 
         return SpendingQuestionValidator.Validate(new RawSpendingQuestionFields(
-            fields.Intent, fields.Category, fields.Period, fields.Year, fields.Month, fields.Limit));
+            fields.Intent, fields.Category, fields.Period, fields.Year, fields.Month, fields.Limit, fields.Day));
     }
 
     private static AiResult<TransactionProposal> ParseProposal(string? modelText, string text, DateOnly today)
@@ -208,9 +235,28 @@ public sealed class GeminiAIService(HttpClient httpClient, IOptions<GeminiOption
         generationConfig = new { responseMimeType = "application/json", responseSchema = SpendingQuestionResponseSchema }
     };
 
+    private static object BuildInsightRequest(MonthlyInsightFacts facts) => new
+    {
+        systemInstruction = new { parts = new[] { new { text = GeminiPrompts.InsightSystemInstruction } } },
+        contents = new[] { new { role = "user", parts = new[] { new { text = GeminiPrompts.BuildInsightMessage(JsonSerializer.Serialize(ToPromptFacts(facts), JsonOptions)) } } } },
+        generationConfig = new { responseMimeType = "application/json", responseSchema = InsightResponseSchema }
+    };
+
+    private static object ToPromptFacts(MonthlyInsightFacts facts) => new
+    {
+        facts.Year,
+        facts.Month,
+        facts.Total,
+        facts.PreviousMonthTotal,
+        facts.ChangePercent,
+        categories = facts.Categories.Select(c => new { c.Category, c.Total, c.Percentage })
+    };
+
     private static AiResult<T> Failed<T>(AiFailure failure) => AiResult<T>.Fail(failure);
 
-    private sealed record GeminiSpendingJson(string? Intent, string? Category, string? Period, int? Year, int? Month, int? Limit);
+    private sealed record GeminiInsightJson(string? Insight);
+
+    private sealed record GeminiSpendingJson(string? Intent, string? Category, string? Period, int? Year, int? Month, int? Limit, int? Day);
 
     private sealed record GeminiExpenseJson(JsonElement? Amount, string? Date, string? Description, string? Category);
 

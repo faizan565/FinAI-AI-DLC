@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("FinAI.Infrastructure")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+fdd218a0d3559e7dbad86f49a2cdcd7c1d3321fc")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a9bbabb92511c8e75b880974023114a2f9a8758b")]
 [assembly: System.Reflection.AssemblyProductAttribute("FinAI.Infrastructure")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FinAI.Infrastructure")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -16,6 +16,20 @@ public sealed record ApiCategoryTotal(string Category, decimal Total);
 
 public sealed record ApiMonthlySummary(int Year, int Month, decimal Total, IReadOnlyList<ApiCategoryTotal> Categories);
 
+public sealed record ApiMonthlyCategoryShare(string Category, decimal Total, decimal Percentage);
+
+public sealed record ApiMonthlyInsight(
+    int Year,
+    int Month,
+    decimal Total,
+    bool HasData,
+    IReadOnlyList<ApiMonthlyCategoryShare> Categories,
+    decimal? PreviousMonthTotal,
+    decimal? ChangeAmount,
+    decimal? ChangePercent,
+    string Insight,
+    bool GeneratedByAi);
+
 public sealed record ApiExpenseProposalRequest(string Text);
 
 public sealed record ApiExpenseProposal(decimal Amount, DateOnly Date, string Description, string Category, bool DateIsDefaulted);

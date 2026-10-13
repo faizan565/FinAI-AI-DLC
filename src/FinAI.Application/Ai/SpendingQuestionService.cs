@@ -62,8 +62,23 @@ public sealed class SpendingQuestionService(IAIService aiService, ITransactionRe
         {
             SpendingPeriod.PreviousMonth => MonthRange(new DateOnly(today.Year, today.Month, 1).AddMonths(-1)),
             SpendingPeriod.SpecificMonth => MonthRange(new DateOnly(filter.Year ?? today.Year, filter.Month ?? today.Month, 1)),
+            SpendingPeriod.Today => DayRange(today),
+            SpendingPeriod.Yesterday => DayRange(today.AddDays(-1)),
+            SpendingPeriod.DayBeforeYesterday => DayRange(today.AddDays(-2)),
+            SpendingPeriod.SpecificDate => DayRange(new DateOnly(filter.Year!.Value, filter.Month!.Value, filter.Day!.Value)),
+            SpendingPeriod.Last7Days => (today.AddDays(-6), today.AddDays(1)),
+            SpendingPeriod.PreviousWeek => PreviousWeekRange(today),
             _ => MonthRange(new DateOnly(today.Year, today.Month, 1))
         };
 
+    private static (DateOnly From, DateOnly ToExclusive) PreviousWeekRange(DateOnly today)
+    {
+        var daysSinceMonday = ((int)today.DayOfWeek + 6) % 7;
+        var thisMonday = today.AddDays(-daysSinceMonday);
+        return (thisMonday.AddDays(-7), thisMonday);
+    }
+
     private static (DateOnly From, DateOnly ToExclusive) MonthRange(DateOnly firstDay) => (firstDay, firstDay.AddMonths(1));
+
+    private static (DateOnly From, DateOnly ToExclusive) DayRange(DateOnly day) => (day, day.AddDays(1));
 }

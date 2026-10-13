@@ -33,6 +33,9 @@ public sealed class FinAiApiClient(HttpClient httpClient, IHttpContextAccessor h
     public Task<ApiResult<ApiMonthlySummary>> GetMonthlySummaryAsync(int year, int month, CancellationToken cancellationToken) =>
         ExecuteAsync<ApiMonthlySummary>(HttpMethod.Get, $"api/v1/dashboard/monthly?year={year}&month={month}", null, requiresCsrf: false, cancellationToken);
 
+    public Task<ApiResult<ApiMonthlyInsight>> GetMonthlyInsightAsync(int year, int month, CancellationToken cancellationToken) =>
+        ExecuteAsync<ApiMonthlyInsight>(HttpMethod.Get, $"api/v1/dashboard/monthly-insights?year={year}&month={month}", null, requiresCsrf: false, cancellationToken);
+
     public Task<ApiResult<ApiPagedResult<ApiTransaction>>> ListTransactionsAsync(int page, int pageSize, CancellationToken cancellationToken) =>
         ExecuteAsync<ApiPagedResult<ApiTransaction>>(HttpMethod.Get, $"api/v1/transactions?page={page}&pageSize={pageSize}", null, requiresCsrf: false, cancellationToken);
 
